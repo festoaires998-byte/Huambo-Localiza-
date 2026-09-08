@@ -1,0 +1,13 @@
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Mapas / Geocoding (abstração MapProvider / GeocodingProvider)
+MAP_PROVIDER=placeholder
+GEOCODING_PROVIDER=placeholder
+MAP_PROVIDER_API_KEY=
+
+# App
+NEXT_PUBLIC_APP_URL=https://codigopostal.ao
+NODE_ENV=development
