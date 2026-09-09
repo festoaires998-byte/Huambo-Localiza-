@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Angola Localiza</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; background:#0a0f18; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color:#e8e6df; display:flex; justify-content:center; padding:24px 12px; }
+  #app-shell { width:100%; max-width:400px; background:#101826; border-radius:20px; padding-bottom:8px; overflow:hidden; }
+  input, textarea { font-family: inherit; }
+  .al-tab { cursor:pointer; }
+  button { cursor:pointer; }
+  #qr-code img, #qr-code canvas { border-radius:8px; }
+</style>
+</head>
+<body>
+
+<div id="app-shell">
+  <div style="padding:18px 18px 10px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:38px;height:38px;border-radius:10px;background:#f2790f;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:20px;">📍</span>
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:16px;font-weight:600;color:#f5f3ec;">Angola Localiza</div>
+        <div id="session-label" style="font-size:11px;color:#f2790f;">ANGOLA · sem sessão</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="view-login" style="padding:0 18px;">
+    <div style="display:flex;background:#1a2436;border-radius:10px;padding:3px;margin-bottom:14px;">
+      <button id="tab-signin" style="flex:1;background:#f2790f;color:#101826;border:none;height:32px;border-radius:8px;font-size:13px;font-weight:500;">Entrar</button>
+      <button id="tab-signup" style="flex:1;background:none;color:#a3a094;border:none;height:32px;border-radius:8px;font-size:13px;font-weight:500;">Criar conta</button>
+    </div>
+    <input id="input-email" type="email" placeholder="email" style="width:100%;background:#1a2436;border:1px solid rgba(232,230,223,0.12);border-radius:8px;height:38px;padding:0 12px;color:#e8e6df;margin:0 0 8px;" />
+    <input id="input-password" type="password" placeholder="palavra-passe" style="width:100%;background:#1a2436;border:1px solid rgba(232,230,223,0.12);border-radius:8px;height:38px;padding:0 12px;color:#e8e6df;margin:0 0 10px;" />
+    <button id="btn-submit" style="width:100%;background:#f2790f;color:#101826;border:none;height:40px;border-radius:8px;font-size:14px;font-weight:600;">Entrar</button>
+    <p id="auth-msg" style="font-size:12px;margin:8px 0 4px;min-height:14px;"></p>
+  </div>
+
+  <div id="view-app" style="display:none;">
+    <div id="panel-mapa" class="al-panel" style="padding:0 18px;">
+      <div style="font-size:13px;color:#a3a094;margin-bottom:10px;">Mapa e GPS reais · Código Postal Digital gerado ao vivo</div>
+      <button id="btn-locate" style="width:100%;background:#f2790f;color:#101826;border:none;height:40px;border-radius:8px;font-size:14px;font-weight:500;">📍 Obter a minha localização</button>
+      <p id="err-msg" style="display:none;font-size:12px;color:#f0997b;margin:8px 0 0;"></p>
+      <div id="result" style="display:none;margin-top:14px;">
+        <div style="background:#1a2436;border-radius:12px;padding:14px;">
+          <div style="font-size:11px;letter-spacing:0.04em;color:#a3a094;">CÓDIGO POSTAL DIGITAL</div>
+          <div id="postal-value" style="font-size:18px;font-weight:500;color:#f2790f;font-family:monospace;">a calcular...</div>
+
+          <div style="height:1px;background:rgba(232,230,223,0.12);margin:10px 0;"></div>
+          <div style="font-size:11px;color:#a3a094;">PLUS CODE (OPEN LOCATION CODE)</div>
+          <div id="olc-value" style="font-size:14px;font-family:monospace;"></div>
+
+          <div style="height:1px;background:rgba(232,230,223,0.12);margin:10px 0;"></div>
+          <div style="font-size:11px;color:#a3a094;">PROVÍNCIA</div>
+          <div id="province-value" style="font-size:14px;">a identificar...</div>
+
+          <div style="height:1px;background:rgba(232,230,223,0.12);margin:10px 0;"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div><div style="font-size:11px;color:#a3a094;">Precisão</div><div id="accuracy-value" style="font-size:14px;font-weight:500;"></div></div>
+            <div><div style="font-size:11px;color:#a3a094;">Coordenadas</div><div id="coords-value" style="font-size:11px;font-family:monospace;"></div></div>
+          </div>
+
+          <div style="height:1px;background:rgba(232,230,223,0.12);margin:10px 0;"></div>
+          <div style="font-size:11px;color:#a3a094;margin-bottom:8px;">QR CODE · abre a localização no Google Maps</div>
+          <div id="qr-code" style="display:flex;justify-content:center;background:#fff;border-radius:8px;padding:10px;"></div>
+        </div>
+        <div id="map" style="margin-top:10px;height:200px;border-radius:12px;overflow:hidden;"></div>
+        <button id="btn-save-favorite" style="width:100%;background:#1a2436;color:#7fd4a8;border:1px solid #2f4a3d;height:38px;border-radius:8px;font-size:13px;font-weight:500;margin-top:10px;">🔖 Guardar como favorito</button>
+        <p id="save-msg" style="font-size:12px;text-align:center;margin:6px 0 0;"></p>
+      </div>
+    </div>
+
+    <div id="panel-guardados" class="al-panel" style="display:none;padding:0 18px;">
+      <div style="font-size:13px;color:#a3a094;margin-bottom:10px;">Os teus locais guardados.</div>
+      <div id="favorites-list"></div>
+      <div id="favorites-empty" style="display:none;background:#1a2436;border-radius:14px;padding:24px 18px;text-align:center;">
+        <div style="font-size:14px;font-weight:600;margin-top:8px;">Ainda sem favoritos</div>
+        <div style="font-size:12px;color:#a3a094;margin-top:4px;">Guarda um local no Mapa para o veres aqui.</div>
+      </div>
+    </div>
+
+    <div id="panel-entrega" class="al-panel" style="display:none;padding:0 18px;">
+      <div id="entrega-sem-local" style="display:none;background:#1a2436;border-radius:8px;padding:12px;font-size:12px;color:#a3a094;">
+        Vai ao separador Mapa e guarda uma localização primeiro.
+      </div>
+      <div id="entrega-form">
+        <label style="font-size:12px;color:#a3a094;">Nome de quem recebe</label>
+        <input id="entrega-nome" type="text" placeholder="Ex.: Marta Silva" style="width:100%;background:#1a2436;border:1px solid rgba(232,230,223,0.12);border-radius:8px;height:38px;padding:0 12px;color:#e8e6df;margin:4px 0 10px;" />
+        <label style="font-size:12px;color:#a3a094;">Contacto (opcional)</label>
+        <input id="entrega-contacto" type="text" placeholder="+244 9xx xxx xxx" style="width:100%;background:#1a2436;border:1px solid rgba(232,230,223,0.12);border-radius:8px;height:38px;padding:0 12px;color:#e8e6df;margin:4px 0 10px;" />
+        <label style="font-size:12px;color:#a3a094;">Nota para o estafeta</label>
+        <textarea id="entrega-nota" placeholder="Ex.: portão azul, entrada lateral" style="width:100%;background:#1a2436;border:1px solid rgba(232,230,223,0.12);border-radius:8px;padding:10px 12px;color:#e8e6df;margin:4px 0 10px;height:60px;"></textarea>
+        <button id="btn-criar-entrega" style="width:100%;background:#f2790f;color:#101826;border:none;height:40px;border-radius:8px;font-size:14px;font-weight:600;">📦 Criar entrega</button>
+        <p id="entrega-msg" style="font-size:12px;margin:8px 0 0;text-align:center;"></p>
+      </div>
+      <div id="entrega-criada" style="display:none;background:#1a2436;border-radius:12px;padding:16px;text-align:center;">
+        <div style="font-size:14px;font-weight:600;margin-top:8px;">Entrega criada ✅</div>
+        <div style="font-size:11px;color:#a3a094;margin-top:4px;">CÓDIGO DE RASTREIO</div>
+        <div id="tracking-code" style="font-size:16px;font-family:monospace;color:#f2790f;margin-top:2px;"></div>
+        <div style="font-size:11px;color:#a3a094;margin-top:6px;">Estado: CREATED</div>
+      </div>
+    </div>
+
+    <div id="panel-admin" class="al-panel" style="display:none;padding:0 18px;">
+      <div id="admin-stats" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+        <div style="background:#1a2436;border-radius:10px;padding:10px;"><div style="font-size:10px;color:#a3a094;">MORADAS</div><div id="stat-addresses" style="font-size:18px;font-weight:600;">-</div></div>
+        <div style="background:#1a2436;border-radius:10px;padding:10px;"><div style="font-size:10px;color:#a3a094;">ENTREGAS</div><div id="stat-deliveries" style="font-size:18px;font-weight:600;">-</div></div>
+        <div style="background:#1a2436;border-radius:10px;padding:10px;"><div style="font-size:10px;color:#a3a094;">POR APROVAR</div><div id="stat-pending" style="font-size:18px;font-weight:600;color:#f2790f;">-</div></div>
+        <div style="background:#1a2436;border-radius:10px;padding:10px;"><div style="font-size:10px;color:#a3a094;">CAMPO PENDENTE</div><div id="stat-field" style="font-size:18px;font-weight:600;">-</div></div>
+      </div>
+      <div style="font-size:13px;color:#a3a094;margin-bottom:8px;">Moradas por aprovar</div>
+      <div id="pending-list"></div>
+      <div id="pending-empty" style="display:none;font-size:12px;color:#a3a094;background:#1a2436;border-radius:10px;padding:14px;text-align:center;">Nada por aprovar de momento.</div>
+    </div>
+
+    <div id="panel-definicoes" class="al-panel" style="display:none;padding:0 18px;">
+      <button id="btn-logout" style="width:100%;background:#1a2436;border:1px solid rgba(232,230,223,0.15);color:#f0997b;height:40px;border-radius:8px;font-size:13px;font-weight:500;">Terminar sessão</button>
+    </div>
+
+    <div id="bottom-nav" style="display:flex;justify-content:space-around;padding:12px 6px 6px;margin-top:14px;border-top:1px solid rgba(232,230,223,0.08);">
+      <button class="al-tab" data-tab="mapa" style="background:none;border:none;color:#f2790f;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;">🗺️ Mapa</button>
+      <button class="al-tab" data-tab="guardados" style="background:none;border:none;color:#a3a094;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;">🔖 Guardados</button>
+      <button class="al-tab" data-tab="entrega" style="background:none;border:none;color:#a3a094;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;">📦 Entrega</button>
+      <button id="tab-btn-admin" class="al-tab" data-tab="admin" style="display:none;background:none;border:none;color:#a3a094;flex-direction:column;align-items:center;gap:2px;font-size:10px;">🛡️ Admin</button>
+      <button class="al-tab" data-tab="definicoes" style="background:none;border:none;color:#a3a094;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;">⚙️ Definições</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+var SUPABASE_URL = "https://qntbknegicaghnbnghyw.supabase.co";
+var ANON_KEY = "sb_publishable_9RypatlYEYRmx8kRnyNS-A_ZRLMgl_a";
+var session = null;
+var lastLocation = null;
+var lastAddressId = null;
+var isAdmin = false;
+var mode = "signin";
+
+function encodeOLC(lat, lng) {
+  var ALPHABET = '23456789CFGHJMPQRVWX';
+  var RES = [20.0, 1.0, 0.05, 0.0025, 0.000125];
+  lat = Math.min(90, Math.max(-90, lat));
+  if (lat === 90) lat -= 0.000000001;
+  var lng2 = lng;
+  while (lng2 < -180) lng2 += 360;
+  while (lng2 >= 180) lng2 -= 360;
+  var latVal = lat + 90, lngVal = lng2 + 180, code = '';
+  for (var i = 0; i < 5; i++) {
+    var latDigit = Math.floor(latVal / RES[i]); latVal -= latDigit * RES[i]; code += ALPHABET[latDigit];
+    var lngDigit = Math.floor(lngVal / RES[i]); lngVal -= lngDigit * RES[i]; code += ALPHABET[lngDigit];
+    if (i === 3) code += '+';
+  }
+  return code;
+}
+
+var tabSignin = document.getElementById('tab-signin');
+var tabSignup = document.getElementById('tab-signup');
+var btnSubmit = document.getElementById('btn-submit');
+var authMsg = document.getElementById('auth-msg');
+
+function setMode(m) {
+  mode = m;
+  if (m === 'signin') { tabSignin.style.background = '#f2790f'; tabSignin.style.color = '#101826'; tabSignup.style.background = 'none'; tabSignup.style.color = '#a3a094'; btnSubmit.textContent = 'Entrar'; }
+  else { tabSignup.style.background = '#f2790f'; tabSignup.style.color = '#101826'; tabSignin.style.background = 'none'; tabSignin.style.color = '#a3a094'; btnSubmit.textContent = 'Criar conta'; }
+  authMsg.textContent = '';
+}
+tabSignin.addEventListener('click', function() { setMode('signin'); });
+tabSignup.addEventListener('click', function() { setMode('signup'); });
+
+function showApp() {
+  document.getElementById('view-login').style.display = 'none';
+  document.getElementById('view-app').style.display = 'block';
+  document.getElementById('session-label').textContent = 'ANGOLA · ' + session.email;
+  loadFavorites();
+  checkAdmin();
+}
+
+btnSubmit.addEventListener('click', function() {
+  var email = document.getElementById('input-email').value.trim();
+  var password = document.getElementById('input-password').value;
+  if (!email || !password) { authMsg.style.color = '#f0997b'; authMsg.textContent = 'Preenche o email e a palavra-passe.'; return; }
+  btnSubmit.disabled = true; btnSubmit.textContent = 'A processar...';
+  var endpoint = mode === 'signin' ? SUPABASE_URL + '/auth/v1/token?grant_type=password' : SUPABASE_URL + '/auth/v1/signup';
+  fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY }, body: JSON.stringify({ email: email, password: password }) })
+    .then(function(r) { return r.json().then(function(data) { return { status: r.status, data: data }; }); })
+    .then(function(res) {
+      btnSubmit.disabled = false; setMode(mode);
+      if (res.status >= 400) { authMsg.style.color = '#f0997b'; authMsg.textContent = res.data.msg || res.data.error_description || 'Erro ao processar.'; return; }
+      if (mode === 'signup' && !res.data.access_token) { authMsg.style.color = '#7fd4a8'; authMsg.textContent = 'Conta criada! Confirma o email antes de entrares.'; return; }
+      session = { access_token: res.data.access_token, email: (res.data.user && res.data.user.email) || email };
+      showApp();
+    }).catch(function(e) { btnSubmit.disabled = false; setMode(mode); authMsg.style.color = '#f0997b'; authMsg.textContent = 'Erro de ligação: ' + e.message; });
+});
+
+document.getElementById('btn-logout').addEventListener('click', function() {
+  session = null; lastAddressId = null; isAdmin = false;
+  document.getElementById('tab-btn-admin').style.display = 'none';
+  document.getElementById('view-app').style.display = 'none';
+  document.getElementById('view-login').style.display = 'block';
+  document.getElementById('session-label').textContent = 'ANGOLA · sem sessão';
+  document.getElementById('input-email').value = ''; document.getElementById('input-password').value = '';
+});
+
+document.querySelectorAll('.al-tab').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.al-tab').forEach(function(b) { b.style.color = '#a3a094'; });
+    btn.style.color = '#f2790f';
+    document.querySelectorAll('.al-panel').forEach(function(p) { p.style.display = 'none'; });
+    document.getElementById('panel-' + btn.dataset.tab).style.display = 'block';
+    if (btn.dataset.tab === 'guardados') loadFavorites();
+    if (btn.dataset.tab === 'entrega') {
+      document.getElementById('entrega-sem-local').style.display = lastAddressId ? 'none' : 'block';
+      document.getElementById('entrega-form').style.display = lastAddressId ? 'block' : 'none';
+    }
+    if (btn.dataset.tab === 'admin') loadAdmin();
+  });
+});
+
+var btn = document.getElementById('btn-locate');
+var errMsg = document.getElementById('err-msg');
+var resultBox = document.getElementById('result');
+var mapInstance = null;
+var qrInstance = null;
+
+btn.addEventListener('click', function() {
+  errMsg.style.display = 'none';
+  if (!navigator.geolocation) { errMsg.textContent = 'Este dispositivo não suporta GPS.'; errMsg.style.display = 'block'; return; }
+  btn.textContent = 'A localizar...';
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    btn.innerHTML = '📍 Atualizar localização';
+    var lat = pos.coords.latitude, lng = pos.coords.longitude, acc = Math.round(pos.coords.accuracy);
+    var olc = encodeOLC(lat, lng);
+    lastLocation = { lat: lat, lng: lng, plus_code: olc, accuracy: acc, postal_code: null, province_name: null };
+
+    document.getElementById('olc-value').textContent = olc;
+    document.getElementById('accuracy-value').textContent = acc + ' m';
+    document.getElementById('coords-value').textContent = lat.toFixed(5) + ', ' + lng.toFixed(5);
+    document.getElementById('postal-value').textContent = 'a calcular...';
+    document.getElementById('province-value').textContent = 'a identificar...';
+    document.getElementById('save-msg').textContent = '';
+    resultBox.style.display = 'block';
+
+    if (!mapInstance) {
+      mapInstance = L.map('map', { zoomControl: true, attributionControl: false }).setView([lat, lng], 16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance);
+      L.circleMarker([lat, lng], { radius: 8, color: '#f2790f', fillColor: '#f2790f', fillOpacity: 1 }).addTo(mapInstance);
+    } else { mapInstance.setView([lat, lng], 16); }
+    setTimeout(function() { if (mapInstance) mapInstance.invalidateSize(); }, 200);
+
+    // QR code real, gerado localmente (sem serviço externo pago) - aponta para o Google Maps
+    var qrContainer = document.getElementById('qr-code');
+    qrContainer.innerHTML = '';
+    qrInstance = new QRCode(qrContainer, {
+      text: 'https://www.google.com/maps?q=' + lat + ',' + lng,
+      width: 140, height: 140,
+      colorDark: '#101826', colorLight: '#ffffff'
+    });
+
+    // Geocoding reverso real (OpenStreetMap Nominatim, gratuito) para identificar a província
+    fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng + '&format=json&addressdetails=1')
+      .then(function(r) { return r.json(); })
+      .then(function(geo) {
+        var addr = geo.address || {};
+        var province = addr.state || addr.region || addr.county || null;
+        lastLocation.province_name = province;
+        document.getElementById('province-value').textContent = province || 'não identificada';
+        return fetch(SUPABASE_URL + '/functions/v1/generate-postal-code', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY },
+          body: JSON.stringify({ latitude: lat, longitude: lng, province_name: province })
+        });
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        document.getElementById('postal-value').textContent = data.postal_code || 'erro';
+        lastLocation.postal_code = data.postal_code;
+      }).catch(function() {
+        document.getElementById('province-value').textContent = 'erro ao identificar';
+        document.getElementById('postal-value').textContent = 'erro de ligação';
+      });
+  }, function(err) {
+    btn.innerHTML = '📍 Obter a minha localização';
+    errMsg.textContent = 'Não foi possível obter a localização (' + err.message + ').';
+    errMsg.style.display = 'block';
+  }, { enableHighAccuracy: true, timeout: 10000 });
+});
+
+document.getElementById('btn-save-favorite').addEventListener('click', function() {
+  if (!session || !lastLocation) return;
+  var saveMsg = document.getElementById('save-msg');
+  saveMsg.style.color = '#a3a094'; saveMsg.textContent = 'A guardar...';
+
+  fetch(SUPABASE_URL + '/rest/v1/addresses', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token, 'Prefer': 'return=representation' },
+    body: JSON.stringify({
+      latitude: lastLocation.lat, longitude: lastLocation.lng,
+      location: 'SRID=4326;POINT(' + lastLocation.lng + ' ' + lastLocation.lat + ')',
+      plus_code: lastLocation.plus_code, postal_code: lastLocation.postal_code,
+      status: 'PROPOSED', source: 'app'
+    })
+  }).then(function(r) { return r.json(); }).then(function(rows) {
+    var addr = rows[0];
+    if (!addr) { saveMsg.style.color = '#f0997b'; saveMsg.textContent = 'Erro ao guardar a morada.'; return; }
+    lastAddressId = addr.id;
+    return fetch(SUPABASE_URL + '/rest/v1/favorites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token, 'Prefer': 'return=representation' },
+      body: JSON.stringify({ address_id: addr.id, category: 'outro' })
+    });
+  }).then(function(r) { return r && r.json(); }).then(function() {
+    saveMsg.style.color = '#7fd4a8'; saveMsg.textContent = 'Guardado! Já podes criar uma entrega para este local.';
+  }).catch(function() { saveMsg.style.color = '#f0997b'; saveMsg.textContent = 'Erro de ligação.'; });
+});
+
+function loadFavorites() {
+  if (!session) return;
+  var list = document.getElementById('favorites-list');
+  var empty = document.getElementById('favorites-empty');
+  list.innerHTML = '<div style="font-size:12px;color:#a3a094;">A carregar...</div>';
+  empty.style.display = 'none';
+
+  fetch(SUPABASE_URL + '/rest/v1/favorites?select=id,category,created_at,address_id,addresses(postal_code,plus_code,latitude,longitude,reference)&order=created_at.desc', {
+    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+  }).then(function(r) { return r.json(); }).then(function(rows) {
+    list.innerHTML = '';
+    if (!rows || rows.length === 0) { empty.style.display = 'block'; return; }
+    if (!lastAddressId && rows[0]) lastAddressId = rows[0].address_id;
+    rows.forEach(function(fav) {
+      var addr = fav.addresses || {};
+      var div = document.createElement('div');
+      div.style.cssText = 'background:#1a2436;border-radius:10px;padding:12px;margin-bottom:8px;';
+      div.innerHTML = '<div style="font-size:13px;font-weight:500;color:#f2790f;font-family:monospace;">' + (addr.postal_code || addr.plus_code || 'sem código') + '</div>' +
+        '<div style="font-size:11px;color:#a3a094;margin-top:2px;">' + (addr.latitude ? addr.latitude.toFixed(4) + ', ' + addr.longitude.toFixed(4) : '') + ' · ' + fav.category + '</div>';
+      list.appendChild(div);
+    });
+  }).catch(function() { list.innerHTML = '<div style="font-size:12px;color:#f0997b;">Erro ao carregar.</div>'; });
+}
+
+document.getElementById('btn-criar-entrega').addEventListener('click', function() {
+  if (!session || !lastAddressId) return;
+  var nome = document.getElementById('entrega-nome').value.trim();
+  var contacto = document.getElementById('entrega-contacto').value.trim();
+  var nota = document.getElementById('entrega-nota').value.trim();
+  var msg = document.getElementById('entrega-msg');
+  if (!nome) { msg.style.color = '#f0997b'; msg.textContent = 'O nome de quem recebe é obrigatório.'; return; }
+  msg.style.color = '#a3a094'; msg.textContent = 'A criar...';
+
+  fetch(SUPABASE_URL + '/rest/v1/deliveries', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token, 'Prefer': 'return=representation' },
+    body: JSON.stringify({ address_id: lastAddressId, recipient_name: nome, recipient_phone: contacto || null, instructions: nota || null })
+  }).then(function(r) { return r.json(); }).then(function(rows) {
+    var delivery = rows[0];
+    if (!delivery) { msg.style.color = '#f0997b'; msg.textContent = 'Erro ao criar a entrega.'; return; }
+    document.getElementById('entrega-form').style.display = 'none';
+    document.getElementById('entrega-criada').style.display = 'block';
+    document.getElementById('tracking-code').textContent = delivery.tracking_code;
+  }).catch(function() { msg.style.color = '#f0997b'; msg.textContent = 'Erro de ligação.'; });
+});
+
+// ---- Admin ----
+function checkAdmin() {
+  fetch(SUPABASE_URL + '/functions/v1/admin?action=statistics', {
+    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+  }).then(function(r) {
+    isAdmin = r.status === 200;
+    document.getElementById('tab-btn-admin').style.display = isAdmin ? 'flex' : 'none';
+  }).catch(function() { isAdmin = false; });
+}
+
+function loadAdmin() {
+  if (!session || !isAdmin) return;
+
+  fetch(SUPABASE_URL + '/functions/v1/admin?action=statistics', {
+    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+  }).then(function(r) { return r.json(); }).then(function(stats) {
+    document.getElementById('stat-addresses').textContent = (stats && stats.total_addresses) || '-';
+    document.getElementById('stat-deliveries').textContent = (stats && stats.total_deliveries) || '-';
+    document.getElementById('stat-pending').textContent = (stats && stats.addresses_by_status && stats.addresses_by_status.PROPOSED) || 0;
+    document.getElementById('stat-field').textContent = (stats && stats.field_records_pending) || '-';
+  });
+
+  fetch(SUPABASE_URL + '/rest/v1/addresses?status=eq.PROPOSED&select=id,postal_code,plus_code,latitude,longitude,reference,created_at&order=created_at.desc&limit=20', {
+    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+  }).then(function(r) { return r.json(); }).then(function(rows) {
+    var list = document.getElementById('pending-list');
+    var empty = document.getElementById('pending-empty');
+    list.innerHTML = '';
+    if (!rows || rows.length === 0) { empty.style.display = 'block'; return; }
+    empty.style.display = 'none';
+    rows.forEach(function(addr) {
+      var div = document.createElement('div');
+      div.style.cssText = 'background:#1a2436;border-radius:10px;padding:12px;margin-bottom:8px;';
+      div.innerHTML =
+        '<div style="font-size:13px;font-weight:500;color:#f2790f;font-family:monospace;">' + (addr.postal_code || addr.plus_code || 'sem código') + '</div>' +
+        '<div style="font-size:11px;color:#a3a094;margin:2px 0 8px;">' + addr.latitude.toFixed(4) + ', ' + addr.longitude.toFixed(4) + '</div>' +
+        '<div style="display:flex;gap:8px;">' +
+          '<button data-id="' + addr.id + '" data-action="approve_address" class="admin-btn" style="flex:1;background:#7fd4a8;color:#101826;border:none;height:32px;border-radius:6px;font-size:12px;font-weight:600;">Aprovar</button>' +
+          '<button data-id="' + addr.id + '" data-action="reject_address" class="admin-btn" style="flex:1;background:none;border:1px solid #f0997b;color:#f0997b;height:32px;border-radius:6px;font-size:12px;">Rejeitar</button>' +
+        '</div>';
+      list.appendChild(div);
+    });
+    document.querySelectorAll('.admin-btn').forEach(function(b) {
+      b.addEventListener('click', function() {
+        fetch(SUPABASE_URL + '/functions/v1/admin?action=' + b.dataset.action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+          body: JSON.stringify({ address_id: b.dataset.id })
+        }).then(function() { loadAdmin(); });
+      });
+    });
+  });
+}
+</script>
+</body>
+</html>
