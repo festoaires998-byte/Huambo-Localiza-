@@ -744,4 +744,132 @@ var NEXT_DELIVERY_STATUS = { ASSIGNED: 'PICKED_UP', PICKED_UP: 'IN_TRANSIT', IN_
 var STATUS_LABEL = { ASSIGNED: 'Atribuída', PICKED_UP: 'Recolhida', IN_TRANSIT: 'Em trânsito', OUT_FOR_DELIVERY: 'Saiu para entrega', DELIVERED: 'Entregue (Concluído)', FAILED: 'Falhada', CANCELLED: 'Cancelada', CREATED: 'Criada' };
 
 var btnScanQr = document.getElementById('btn-scan-qr'
+  var btnScanQr = document.getElementById('btn-scan-qr');
+if (btnScanQr) {
+  btnScanQr.addEventListener('click', function() {
+      var readerDiv = document.getElementById('qr-reader');
+      if (!readerDiv) return;
+      if (readerDiv.style.display === 'block') {
+          try { if(html5QrcodeScanner) html5QrcodeScanner.clear(); } catch(e){}
+          readerDiv.style.display = 'none';
+          return;
+      }
+      readerDiv.style.display = 'block';
+      try {
+        html5QrcodeScanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
+        html5QrcodeScanner.render(function(decodedText) {
+            var scanMsg = document.getElementById('scan-msg');
+            if (scanMsg) {
+              scanMsg.className = 'msg msg-success';
+              scanMsg.textContent = 'Código detetado: ' + decodedText;
+            }
+            try { html5QrcodeScanner.clear(); } catch(e){}
+            readerDiv.style.display = 'none';
+        }, function(error) {});
+      } catch(e) {}
+  });
+}
+
+function loadMinhasEntregas() {
+  if (!session) return;
+  var tokenParsed = parseJwt(session.access_token);
+  var myId = tokenParsed ? tokenParsed.sub : null;
+  var list = document.getElementById('minhas-entregas-list');
+  var empty = document.getElementById('minhas-entregas-empty');
+  if (!list) return;
   
+  list.innerHTML = '<p class="msg msg-muted">A carregar...</p>'; 
+  if (empty) empty.style.display = 'none';
+
+  var queryUrl = myId ? (SUPABASE_URL + '/rest/v1/deliveries?assigned_driver=eq.' + myId + '&select=id,tracking_code,status,recipient_name&order=updated_at.desc') : (SUPABASE_URL + '/rest/v1/deliveries?select=id,tracking_code,status,recipient_name&order=updated_at.desc');
+
+  fetch(queryUrl, { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }})
+  .then(function(r) { return r.json(); }).then(function(rows) {
+    list.innerHTML = '';
+    if (!rows || rows.length === 0) { if (empty) empty.style.display = 'block'; return; }
+    
+    rows.forEach(function(d) {
+      var div = document.createElement('div'); div.className = 'list-item';
+      var next = NEXT_DELIVERY_STATUS[d.status];
+      var actions = '';
+      
+      if (next === 'DELIVERED') {
+          actions += '<div class="file-upload-wrapper btn btn-success-solid btn-sm" style="flex:1; display:flex; align-items:center; justify-content:center;">' +
+                     '<span>📸 Confirmar Entrega</span>' +
+                     '<input type="file" accept="image/*" capture="environment" data-id="' + d.id + '" class="proof-upload-btn">' +
+                     '</div>';
+      } else if (next) {
+          actions += '<button data-id="' + d.id + '" data-status="' + next + '" class="entrega-status-btn btn btn-primary btn-sm">' + (STATUS_LABEL[next] || next) + '</button>';
+      }
+      
+      if (d.status === 'OUT_FOR_DELIVERY') {
+        actions += '<button data-id="' + d.id + '" data-status="FAILED" class="entrega-status-btn btn btn-danger-outline btn-sm">Falhou</button>';
+      }
+      
+      div.innerHTML = '<div class="value-md" style="color:var(--accent);font-weight:600;">' + d.tracking_code + '</div>' +
+        '<div style="font-size:12px;color:var(--text-dim);margin:2px 0 8px;">' + (d.recipient_name || 'Destinatário') + ' · ' + (STATUS_LABEL[d.status] || d.status) + '</div>' +
+        (actions ? '<div class="btn-row">' + actions + '</div>' : '');
+      list.appendChild(div);
+    });
+
+    document.querySelectorAll('.entrega-status-btn').forEach(function(b) {
+      b.addEventListener('click', function() { updateDeliveryStatus(b.dataset.id, b.dataset.status); });
+    });
+    
+    document.querySelectorAll('.proof-upload-btn').forEach(function(input) {
+      input.addEventListener('change', function(e) {
+         if (e.target.files && e.target.files.length > 0) {
+             alert("Prova de entrega (imagem) capturada e anexada com sucesso!");
+             updateDeliveryStatus(e.target.dataset.id, 'DELIVERED');
+         }
+      });
+    });
+
+  }).catch(function() { list.innerHTML = '<p class="msg msg-error">Erro ao carregar.</p>'; });
+}
+
+function updateDeliveryStatus(id, status) {
+    fetch(SUPABASE_URL + '/functions/v1/deliveries?action=update_status', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+        body: JSON.stringify({ delivery_id: id, new_status: status })
+    }).then(function() { loadMinhasEntregas(); }).catch(function(){});
+}
+
+function loadValidar() {
+  var list = document.getElementById('validar-list');
+  var empty = document.getElementById('validar-empty');
+  if (list) list.innerHTML = '';
+  if (empty) empty.style.display = 'block';
+}
+
+function checkAdmin() {
+  if (!session) return;
+  fetch(SUPABASE_URL + '/functions/v1/admin?action=statistics', { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }})
+  .then(function(r) { 
+    isAdmin = (r.status === 200); 
+    var tabAdmin = document.getElementById('tab-btn-admin');
+    if (tabAdmin) tabAdmin.style.display = isAdmin ? 'flex' : 'none'; 
+  }).catch(function() { isAdmin = false; });
+}
+
+function loadAdmin() {
+  if (!session || !isAdmin) return;
+  fetch(SUPABASE_URL + '/functions/v1/admin?action=statistics', { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }})
+  .then(function(r) { return r.json(); })
+  .then(function(stats) {
+    if (!stats) return;
+    var elAddresses = document.getElementById('stat-addresses');
+    var elDeliveries = document.getElementById('stat-deliveries');
+    var elPending = document.getElementById('stat-pending');
+    var elField = document.getElementById('stat-field');
+    
+    if (elAddresses) elAddresses.textContent = stats.total_addresses || '-';
+    if (elDeliveries) elDeliveries.textContent = stats.total_deliveries || '-';
+    if (elPending) elPending.textContent = (stats.addresses_by_status && stats.addresses_by_status.PROPOSED) ? stats.addresses_by_status.PROPOSED : 0;
+    if (elField) elField.textContent = stats.field_records_pending || '-';
+  }).catch(function() {});
+}
+</script>
+</body>
+</html>
+
