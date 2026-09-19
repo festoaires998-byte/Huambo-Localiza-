@@ -1,0 +1,2312 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Angola Localiza</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root {
+    --bg: #0a0f18;
+    --surface: #101826;
+    --surface-2: #1a2436;
+    --surface-3: #212d42;
+    --accent: #f2790f;
+    --accent-dim: rgba(242,121,15,0.14);
+    --text: #f5f3ec;
+    --text-dim: #a3a094;
+    --text-faint: #6b6960;
+    --success: #7fd4a8;
+    --success-dim: rgba(127,212,168,0.12);
+    --danger: #f0997b;
+    --border: rgba(232,230,223,0.12);
+    --radius-lg: 22px;
+    --radius-md: 14px;
+    --radius-sm: 10px;
+    --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 28px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; overscroll-behavior: none; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex; justify-content: center; padding: 0;
+  }
+  #app-shell {
+    width: 100%; max-width: 460px; height: 100dvh;
+    background: var(--surface); display: flex; flex-direction: column; overflow: hidden;
+  }
+  @media (min-width: 480px) {
+    body { padding: var(--sp-6) var(--sp-4); align-items: center; }
+    #app-shell { height: 90vh; max-height: 860px; border-radius: var(--radius-lg); box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+  }
+
+  input, textarea, button { font-family: inherit; }
+  button { cursor: pointer; }
+
+  .header { flex-shrink: 0; display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-5) var(--sp-4) var(--sp-4); }
+  .logo { width: 42px; height: 42px; border-radius: var(--radius-sm); background: var(--accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 21px; }
+  .header-text { flex: 1; min-width: 0; }
+  .brand { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+  .session-label { font-size: 11.5px; color: var(--accent); font-weight: 500; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .content { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; padding: 0 var(--sp-4) var(--sp-5); }
+  .stack > * + * { margin-top: var(--sp-4); }
+  .stack-sm > * + * { margin-top: var(--sp-2); }
+
+  .lead { font-size: 13.5px; color: var(--text-dim); line-height: 1.5; margin: 0 0 var(--sp-4); }
+
+  .field { display: block; }
+  .field + .field { margin-top: var(--sp-3); }
+  .field label { display: block; font-size: 12px; color: var(--text-dim); font-weight: 500; margin-bottom: var(--sp-2); }
+  .input {
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); height: 46px; padding: 0 var(--sp-4);
+    color: var(--text); font-size: 14.5px; outline: none; transition: border-color .15s;
+  }
+  .input:focus { border-color: var(--accent); }
+  textarea.input { height: auto; min-height: 76px; padding: var(--sp-3) var(--sp-4); resize: vertical; }
+
+  .btn {
+    height: 48px; border-radius: var(--radius-sm); border: none;
+    font-size: 14.5px; font-weight: 600; display: flex; align-items: center;
+    justify-content: center; gap: var(--sp-2); width: 100%; transition: opacity .15s, transform .1s;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.6; }
+  .btn-primary { background: var(--accent); color: var(--bg); }
+  .btn-secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+  .btn-success-outline { background: var(--surface-2); color: var(--success); border: 1px solid rgba(127,212,168,0.3); }
+  .btn-danger-outline { background: transparent; color: var(--danger); border: 1px solid rgba(240,153,123,0.4); }
+  .btn-success-solid { background: var(--success); color: #0d1f16; }
+  .btn-sm { height: 40px; font-size: 13px; }
+  .btn-row { display: flex; gap: var(--sp-3); }
+  .btn-row .btn { flex: 1; }
+
+  .segmented { display: flex; background: var(--surface-2); border-radius: var(--radius-sm); padding: 4px; gap: 4px; }
+  .segmented button {
+    flex: 1; height: 38px; border: none; border-radius: 8px; background: none;
+    color: var(--text-dim); font-size: 13.5px; font-weight: 600;
+  }
+  .segmented button.active { background: var(--accent); color: var(--bg); }
+
+  .card { background: var(--surface-2); border-radius: var(--radius-md); padding: var(--sp-4); }
+  .card-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+  .divider { height: 1px; background: var(--border); margin: var(--sp-4) 0; }
+  .label-caps { font-size: 10.5px; letter-spacing: 0.06em; color: var(--text-dim); font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+  .value-lg { font-size: 19px; font-weight: 600; color: var(--accent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+  .value-md { font-size: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .value-plain { font-size: 14.5px; font-weight: 500; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
+  .icon-btn {
+    width: 38px; height: 38px; border-radius: var(--radius-sm); border: none;
+    background: rgba(245,243,236,0.08); color: var(--text); display: flex;
+    align-items: center; justify-content: center; flex-shrink: 0; font-size: 16px;
+  }
+
+  .empty-state { background: var(--surface-2); border-radius: var(--radius-md); padding: var(--sp-6) var(--sp-4); text-align: center; }
+  .empty-state .icon { font-size: 26px; }
+  .empty-state .title { font-size: 15px; font-weight: 600; margin-top: var(--sp-2); }
+  .empty-state .desc { font-size: 12.5px; color: var(--text-dim); margin-top: 4px; line-height: 1.5; }
+
+  .list-item { background: var(--surface-2); border-radius: var(--radius-sm); padding: var(--sp-3) var(--sp-4); }
+  .list-item + .list-item { margin-top: var(--sp-2); }
+
+  .qr-box { display: flex; justify-content: center; background: #fff; border-radius: var(--radius-sm); padding: var(--sp-3); }
+  .qr-box img, .qr-box canvas { border-radius: 6px; display: block; }
+
+  #map { border-radius: var(--radius-md); overflow: hidden; height: 190px; }
+
+  .msg { font-size: 12.5px; text-align: center; min-height: 16px; }
+  .msg-error { color: var(--danger); }
+  .msg-success { color: var(--success); }
+  .msg-muted { color: var(--text-dim); }
+
+  .stat-card { background: var(--surface-2); border-radius: var(--radius-sm); padding: var(--sp-3) var(--sp-3); }
+  .stat-card .n { font-size: 20px; font-weight: 700; margin-top: 2px; }
+
+  .tab-bar {
+    flex-shrink: 0; display: flex; justify-content: space-around; align-items: stretch;
+    padding: var(--sp-2) var(--sp-2);
+    padding-bottom: calc(var(--sp-2) + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border); background: var(--surface);
+  }
+  .tab-btn {
+    background: none; border: none; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 4px; font-size: 10.5px; font-weight: 600;
+    color: var(--text-dim); padding: var(--sp-2) var(--sp-1); border-radius: var(--radius-sm);
+    flex: 1; min-height: 56px;
+  }
+  .tab-btn .ic { font-size: 22px; line-height: 1; }
+  .tab-btn.active { color: var(--accent); background: var(--accent-dim); }
+
+  .view { display: none; flex: 1; min-height: 0; flex-direction: column; overflow: hidden; }
+  .view.visible { display: flex; }
+  .panel { display: none; padding: var(--sp-4) var(--sp-4) var(--sp-5); }
+  .panel.visible { display: block; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+</style>
+</head>
+<body>
+
+<div id="app-shell">
+  <div class="header">
+    <div class="logo">📍</div>
+    <div class="header-text">
+      <div class="brand">Angola Localiza</div>
+      <div id="session-label" class="session-label">ANGOLA · sem sessão</div>
+    </div>
+  </div>
+
+  <div id="view-login" class="view visible">
+    <div class="content">
+      <div class="segmented" style="margin-bottom: var(--sp-4);">
+        <button id="tab-signin" class="active">Entrar</button>
+        <button id="tab-signup">Criar conta</button>
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input id="input-email" class="input" type="email" placeholder="nome@exemplo.com" />
+      </div>
+      <div class="field">
+        <label>Palavra-passe</label>
+        <input id="input-password" class="input" type="password" placeholder="mínimo 6 caracteres" />
+      </div>
+      <button id="btn-submit" class="btn btn-primary" style="margin-top: var(--sp-4);">Entrar</button>
+      <p id="auth-msg" class="msg" style="margin-top: var(--sp-3);"></p>
+    </div>
+  </div>
+
+  <div id="view-mfa-login" class="view">
+    <div class="content">
+      <p class="lead">A tua conta tem verificação em dois passos ativa. Introduz o código da app de autenticação.</p>
+      <div class="field">
+        <label>Código de 6 dígitos</label>
+        <input id="mfa-login-code" class="input" type="text" placeholder="000000" />
+      </div>
+      <button id="btn-mfa-login-verify" class="btn btn-primary" style="margin-top: var(--sp-4);">Confirmar</button>
+      <p id="mfa-login-msg" class="msg" style="margin-top: var(--sp-3);"></p>
+    </div>
+  </div>
+
+  <div id="view-app" class="view">
+    <div id="panel-mapa" class="panel visible">
+      <p class="lead">Mapa e GPS reais · Código Postal Digital gerado ao vivo</p>
+
+      <div class="field" style="margin-bottom:var(--sp-3);">
+        <input id="search-input" class="input" type="text" placeholder="Pesquisar código, Plus Code, rua, bairro..." />
+      </div>
+      <div id="search-results" class="stack-sm" style="margin-bottom:var(--sp-3);"></div>
+
+      <div class="btn-row" style="margin-bottom:var(--sp-3);">
+        <button id="btn-locate" class="btn btn-primary">📍 Obter localização</button>
+        <button id="btn-scan-qr" class="btn btn-secondary" style="flex:0 0 auto;width:auto;padding:0 var(--sp-4);">📷 Ler QR</button>
+      </div>
+      <div id="scanner-box" style="display:none;margin-bottom:var(--sp-4);">
+        <video id="scanner-video" style="width:100%;border-radius:var(--radius-md);background:#000;" playsinline muted></video>
+        <button id="btn-scan-cancelar" class="btn btn-secondary btn-sm" style="margin-top:var(--sp-2);">Cancelar</button>
+      </div>
+      <p id="scan-result" class="msg"></p>
+      <p id="err-msg" class="msg msg-error" style="display:none;margin-top:var(--sp-2);"></p>
+
+      <div id="result" style="display:none;margin-top:var(--sp-4);" class="stack">
+        <div class="card">
+          <div class="label-caps">Código Postal Digital</div>
+          <div id="postal-value" class="value-lg">a calcular...</div>
+
+          <div class="divider"></div>
+          <div class="label-caps">Plus Code (Open Location Code)</div>
+          <div id="olc-value" class="value-md"></div>
+
+          <div class="divider"></div>
+          <div class="label-caps">Província</div>
+          <div id="province-value" class="value-plain">a identificar...</div>
+
+          <div class="divider"></div>
+          <div class="grid-2">
+            <div><div class="label-caps">Precisão</div><div id="accuracy-value" class="value-plain"></div></div>
+            <div><div class="label-caps">Coordenadas</div><div id="coords-value" class="value-md"></div></div>
+          </div>
+
+          <div class="divider"></div>
+          <div class="label-caps" style="margin-bottom:var(--sp-3);">QR Code · abre no Google Maps</div>
+          <div id="qr-code" class="qr-box"></div>
+        </div>
+
+        <div id="map"></div>
+
+        <div class="field">
+          <label>Privacidade</label>
+          <select id="favorite-visibility" class="input">
+            <option value="PUBLIC">Pública (visível a todos no link/cartão)</option>
+            <option value="LIMITED">Limitada (esconde o contacto)</option>
+            <option value="PRIVATE">Privada (só tu e admins)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Categoria</label>
+          <select id="favorite-category" class="input">
+            <option value="outro">Outro</option>
+            <option value="casa">Casa</option>
+            <option value="trabalho">Trabalho</option>
+            <option value="familia">Família</option>
+            <option value="cliente">Cliente</option>
+            <option value="loja">Loja</option>
+            <option value="entrega">Entrega</option>
+          </select>
+        </div>
+        <button id="btn-save-favorite" class="btn btn-success-outline">🔖 Guardar como favorito</button>
+        <p id="save-msg" class="msg"></p>
+      </div>
+    </div>
+
+    <div id="panel-guardados" class="panel">
+      <p class="lead">Os teus locais guardados.</p>
+      <div id="favorites-list" class="stack-sm"></div>
+      <div id="favorites-empty" class="empty-state" style="display:none;">
+        <div class="icon">🔖</div>
+        <div class="title">Ainda sem favoritos</div>
+        <div class="desc">Guarda um local no Mapa para o veres aqui.</div>
+      </div>
+    </div>
+
+    <div id="panel-entrega" class="panel">
+      <div id="entrega-form" class="stack">
+        <p class="lead" style="margin:0;">Dê ao estafeta o código exato da porta e uma nota útil.</p>
+        <div class="field">
+          <label>Destino *</label>
+          <select id="entrega-destino" class="input">
+            <option value="">Escolhe um local guardado...</option>
+          </select>
+        </div>
+        <div id="entrega-risco-banner" style="display:none;background:rgba(240,153,123,0.12);border:1px solid var(--danger);border-radius:10px;padding:10px 12px;">
+          <div style="color:var(--danger);font-size:12.5px;font-weight:600;">⚠️ Esta morada ainda não está totalmente verificada.</div>
+          <div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">Considera pedir verificação (separador Validar) antes de confiares uma entrega importante a este destino.</div>
+        </div>
+        <div>
+          <div class="field">
+            <label>Nome de quem recebe</label>
+            <input id="entrega-nome" class="input" type="text" placeholder="Ex.: Marta Silva" />
+          </div>
+          <div class="field">
+            <label>Contacto (opcional)</label>
+            <input id="entrega-contacto" class="input" type="text" placeholder="+244 9xx xxx xxx" />
+          </div>
+          <div class="field">
+            <label>Nota para o estafeta</label>
+            <textarea id="entrega-nota" class="input" placeholder="Ex.: portão azul, entrada lateral"></textarea>
+          </div>
+        </div>
+        <button id="btn-criar-entrega" class="btn btn-primary" disabled>📦 Criar entrega</button>
+        <p id="entrega-msg" class="msg" style="margin-top:calc(var(--sp-4) * -1 + var(--sp-2));"></p>
+      </div>
+
+      <div id="entrega-criada" class="card" style="display:none;text-align:center;">
+        <div style="font-size:15px;font-weight:700;">Entrega criada ✅</div>
+        <div class="label-caps" style="margin-top:var(--sp-3);">Código Postal Digital</div>
+        <div id="entrega-postal-code" class="value-lg" style="color:var(--accent);"></div>
+        <div class="label-caps" style="margin-top:var(--sp-2);">Código de rastreio</div>
+        <div id="tracking-code" class="value-md">-</div>
+        <div id="entrega-estado" class="msg-muted" style="font-size:12px;margin-top:4px;">Estado: Criada</div>
+
+        <div style="background:#1a2436;border:1px solid rgba(242,121,15,0.35);border-radius:10px;padding:12px;margin-top:var(--sp-3);">
+          <div class="label-caps" style="color:var(--accent);">PIN de confirmação — partilha com quem vai receber</div>
+          <div id="delivery-pin" class="value-lg" style="font-size:24px;letter-spacing:0.1em;">----</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">O estafeta só consegue fechar a entrega com este código.</div>
+        </div>
+
+        <div id="entrega-preco-box" style="background:#1a2436;border-radius:10px;padding:10px 14px;margin-top:var(--sp-3);text-align:left;">
+          <div class="label-caps">Preço</div>
+          <div id="entrega-preco-linha" class="value-plain"></div>
+        </div>
+
+        <div id="entrega-qr" class="qr-box" style="margin-top:var(--sp-4);"></div>
+
+        <div class="btn-row" style="margin-top:var(--sp-4);">
+          <button id="btn-partilhar-entrega" class="btn btn-primary btn-sm">📤 Partilhar</button>
+          <button id="btn-copiar-entrega" class="btn btn-secondary btn-sm">Copiar código</button>
+        </div>
+        <p id="entrega-share-msg" class="msg msg-success" style="margin-top:var(--sp-2);"></p>
+      </div>
+    </div>
+
+    <div id="panel-minhas-entregas" class="panel">
+      <p id="entregas-stats" class="value-plain" style="margin-bottom:4px;">Hoje: -- entregas · -- com prova · --% sucesso</p>
+      <p id="entregas-offline-mini" class="msg msg-muted" style="margin:0 0 var(--sp-3);"></p>
+      <div class="field" style="margin-bottom:var(--sp-3);">
+        <input id="minhas-entregas-search" class="input" type="text" placeholder="Procurar por código ou nome..." />
+      </div>
+      <div class="segmented" style="margin-bottom:var(--sp-3);">
+        <button class="entregas-filter-btn active" data-filter="todas">Todas</button>
+        <button class="entregas-filter-btn" data-filter="em_curso">Em curso</button>
+        <button class="entregas-filter-btn" data-filter="falhadas">Falhadas</button>
+        <button class="entregas-filter-btn" data-filter="concluidas">Concluídas</button>
+      </div>
+      <div id="minhas-entregas-list" class="stack-sm"></div>
+      <div id="minhas-entregas-empty" class="empty-state" style="display:none;">
+        <div class="desc" style="margin:0;">Ainda sem entregas atribuídas.</div>
+      </div>
+
+      <div id="pod-box" class="card" style="display:none;margin-top:var(--sp-3);">
+        <div style="font-weight:700;">📦 Prova de entrega</div>
+        <div class="field" style="margin-top:var(--sp-3);">
+          <label>Foto (porta/pacote entregue)</label>
+          <input id="pod-photo-input" type="file" accept="image/*" capture="environment" class="input" style="padding:10px;" />
+          <p id="pod-photo-status" class="msg" style="margin-top:4px;"></p>
+          <img id="pod-photo-preview" style="display:none;width:100%;border-radius:10px;margin-top:8px;" />
+        </div>
+        <div class="field">
+          <label>Assinatura de quem recebeu</label>
+          <canvas id="pod-signature-canvas" style="width:100%;height:140px;background:#fff;border-radius:10px;touch-action:none;"></canvas>
+          <button id="btn-pod-limpar-assinatura" class="btn btn-secondary btn-sm" style="margin-top:6px;">Limpar</button>
+        </div>
+        <div class="field">
+          <label>Nota (opcional)</label>
+          <textarea id="pod-observacao" class="input" placeholder="Ex.: entregue ao porteiro"></textarea>
+        </div>
+        <div class="field">
+          <label>PIN de confirmação</label>
+          <input id="pod-pin" class="input" type="text" placeholder="Pede ao destinatário" />
+        </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;"><input id="pod-volumoso" type="checkbox" /> Volumoso (+500 Kz)</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-top:4px;"><input id="pod-espera-longa" type="checkbox" /> Esperou mais de 15 min (+300 Kz)</label>
+        </div>
+        <div class="btn-row" style="margin-top:var(--sp-3);">
+          <button id="btn-pod-confirmar" class="btn btn-primary">✅ Entregue com prova</button>
+          <button id="btn-pod-cancelar" class="btn btn-secondary">Cancelar</button>
+        </div>
+        <p id="pod-msg" class="msg" style="margin-top:var(--sp-2);"></p>
+      </div>
+
+      <div id="falha-box" class="card" style="display:none;margin-top:var(--sp-3);">
+        <div style="font-weight:700;color:var(--danger);">⚠️ Motivo da falha</div>
+        <select id="falha-motivo" class="input" style="margin-top:var(--sp-3);">
+          <option value="morada_nao_encontrada">Morada não encontrada</option>
+          <option value="destinatario_ausente">Destinatário ausente</option>
+          <option value="codigo_incorreto">Código incorreto</option>
+          <option value="recusa">Recusa</option>
+          <option value="outro">Outro</option>
+        </select>
+        <textarea id="falha-nota" class="input" style="margin-top:8px;" placeholder="Nota adicional (opcional)"></textarea>
+        <div class="btn-row" style="margin-top:var(--sp-3);">
+          <button id="btn-falha-confirmar" class="btn btn-danger-outline">Confirmar falha</button>
+          <button id="btn-falha-cancelar" class="btn btn-secondary">Cancelar</button>
+        </div>
+        <p id="falha-msg" class="msg" style="margin-top:var(--sp-2);"></p>
+      </div>
+    </div>
+
+    <div id="panel-campo" class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-3);">
+        <p class="lead" style="margin:0;">Levantamento de campo.</p>
+        <div style="text-align:right;">
+          <div id="campo-daily-count" class="value-plain" style="font-size:13px;">-- hoje</div>
+        </div>
+      </div>
+      <p id="campo-offline-mini" class="msg msg-muted" style="margin:0 0 var(--sp-3);"></p>
+
+      <button id="btn-campo-gps" class="btn btn-secondary">📍 Capturar GPS (3 leituras)</button>
+      <p id="campo-gps-value" class="msg msg-muted" style="margin-top:var(--sp-2);"></p>
+
+      <div id="campo-gps-card" style="display:none;" class="card">
+        <div class="grid-2">
+          <div><div class="label-caps">Coordenadas</div><div id="campo-coords" class="value-md"></div></div>
+          <div><div class="label-caps">Precisão</div><div id="campo-precisao" class="value-plain"></div></div>
+        </div>
+        <div class="divider"></div>
+        <div class="label-caps">Plus Code (Google)</div>
+        <div id="campo-pluscode-value" class="value-md" style="color:var(--accent);"></div>
+        <div class="divider"></div>
+        <div class="label-caps">Divisão administrativa (do GPS)</div>
+        <div id="campo-chips" class="value-plain">a identificar...</div>
+        <div class="divider"></div>
+        <div class="label-caps">Código previsto</div>
+        <div id="campo-codigo-previsto" class="value-md" style="color:var(--accent);">a calcular...</div>
+
+        <div id="campo-precisao-baixa-box" style="display:none;margin-top:var(--sp-3);">
+          <label style="font-size:12px;color:var(--danger);">Precisão baixa — justifica (mín. 10 caracteres) para continuares</label>
+          <textarea id="campo-precisao-justificacao" class="input" style="margin-top:6px;" placeholder="Ex.: sinal fraco dentro do quintal murado"></textarea>
+        </div>
+
+        <button id="btn-campo-recapturar" class="btn btn-secondary btn-sm" style="margin-top:var(--sp-3);">🔄 Capturar novamente</button>
+      </div>
+
+      <div id="campo-duplicado-box" style="display:none;margin-top:var(--sp-3);" class="card">
+        <div style="color:var(--danger);font-weight:600;">⚠️ Já existe uma morada perto</div>
+        <div id="campo-duplicado-info" class="value-plain" style="margin-top:4px;"></div>
+        <textarea id="campo-duplicado-justificacao" class="input" style="margin-top:8px;display:none;" placeholder="Justifica porque é um ponto diferente (mín. 10 caracteres)"></textarea>
+        <div class="btn-row" style="margin-top:var(--sp-2);">
+          <button id="btn-duplicado-vincular" class="btn btn-secondary btn-sm">Vincular e completar existente</button>
+          <button id="btn-duplicado-nova" class="btn btn-danger-outline btn-sm">É um ponto diferente</button>
+        </div>
+      </div>
+
+      <div class="stack" style="margin-top:var(--sp-4);">
+        <div class="field"><label>Número da porta *</label><input id="campo-house" class="input" type="text" placeholder="Ex.: 24" /></div>
+
+        <div class="field">
+          <label>Rua *</label>
+          <input id="campo-street" class="input" type="text" placeholder="Nome da rua" />
+          <label style="font-size:11.5px;color:var(--text-dim);display:flex;align-items:center;gap:6px;margin-top:6px;">
+            <input id="campo-street-sem-nome" type="checkbox" /> Sem nome oficial
+          </label>
+        </div>
+        <div class="field">
+          <label>Bairro *</label>
+          <input id="campo-neighborhood" class="input" type="text" placeholder="Nome do bairro" list="campo-bairros-lista" />
+          <datalist id="campo-bairros-lista"></datalist>
+        </div>
+        <div class="field"><label>Referência *</label><input id="campo-reference" class="input" type="text" placeholder="Ponto de referência" /></div>
+
+        <div class="field">
+          <label>📷 Foto da fachada *</label>
+          <input id="campo-photo-facade-input" type="file" accept="image/*" capture="environment" class="input" style="padding:10px;" />
+          <p id="campo-photo-facade-status" class="msg" style="margin-top:4px;"></p>
+          <img id="campo-photo-facade-preview" style="display:none;width:100%;border-radius:10px;margin-top:8px;" />
+        </div>
+        <div class="field">
+          <label>📷 Foto do autocolante QR *</label>
+          <input id="campo-photo-qr-input" type="file" accept="image/*" capture="environment" class="input" style="padding:10px;" />
+          <p id="campo-photo-qr-status" class="msg" style="margin-top:4px;"></p>
+          <img id="campo-photo-qr-preview" style="display:none;width:100%;border-radius:10px;margin-top:8px;" />
+        </div>
+      </div>
+      <button id="btn-campo-enviar" class="btn btn-primary" style="margin-top:var(--sp-4);" disabled>Enviar levantamento</button>
+      <p id="campo-msg" class="msg" style="margin-top:var(--sp-2);"></p>
+
+      <div id="campo-sucesso-card" class="card" style="display:none;text-align:center;margin-top:var(--sp-3);">
+        <div style="font-weight:700;">✅ Levantamento guardado como PROPOSTO</div>
+        <div class="label-caps" style="margin-top:8px;">Código previsto</div>
+        <div id="campo-sucesso-codigo" class="value-lg"></div>
+        <div style="font-size:12px;color:var(--success);margin-top:6px;">Estado: PROPOSTA</div>
+        <div style="font-size:11.5px;color:var(--text-dim);margin-top:4px;">Aguarda aprovação no separador Validar.</div>
+        <button id="btn-campo-proxima-porta" class="btn btn-primary" style="margin-top:var(--sp-3);">➡️ Próxima porta</button>
+      </div>
+    </div>
+
+
+    <div id="panel-validar" class="panel">
+      <p class="lead">Levantamentos de campo por validar.</p>
+      <div id="validar-list" class="stack-sm"></div>
+      <div id="validar-empty" class="empty-state" style="display:none;">
+        <div class="desc" style="margin:0;">Nada por validar de momento.</div>
+      </div>
+    </div>
+
+    <div id="panel-admin" class="panel">
+      <div class="grid-2" style="margin-bottom:var(--sp-5);">
+        <div class="stat-card"><div class="label-caps" style="margin:0;">Moradas</div><div id="stat-addresses" class="n">-</div></div>
+        <div class="stat-card"><div class="label-caps" style="margin:0;">Entregas</div><div id="stat-deliveries" class="n">-</div></div>
+        <div class="stat-card"><div class="label-caps" style="margin:0;">Por aprovar</div><div id="stat-pending" class="n" style="color:var(--accent);">-</div></div>
+        <div class="stat-card"><div class="label-caps" style="margin:0;">Campo pendente</div><div id="stat-field" class="n">-</div></div>
+      </div>
+      <p class="lead" style="margin-bottom:var(--sp-3);">Moradas por aprovar</p>
+      <div id="pending-list" class="stack-sm"></div>
+      <div id="pending-empty" class="empty-state" style="display:none;">
+        <div class="desc" style="margin:0;">Nada por aprovar de momento.</div>
+      </div>
+
+      <p class="lead" style="margin:var(--sp-5) 0 var(--sp-3);">Bandas de preço (Fase 1 do modelo de negócio)</p>
+      <div id="pricing-zones-list" class="stack-sm"></div>
+      <p class="lead" style="margin:var(--sp-4) 0 var(--sp-2);">Livro-razão (usage_events)</p>
+      <p id="pricing-ledger-summary" class="msg msg-muted"></p>
+
+      <p class="lead" style="margin:var(--sp-5) 0 var(--sp-3);">Convidar utilizador (atribui o cargo)</p>
+      <div class="field">
+        <label>Email</label>
+        <input id="invite-email" class="input" type="email" placeholder="nome@exemplo.com" />
+      </div>
+      <div id="invite-sector-field" class="field" style="display:none;">
+        <label>Setor / Instituição</label>
+        <select id="invite-sector" class="input"></select>
+      </div>
+      <p id="invite-sector-readonly" class="msg msg-muted" style="display:none;margin:0 0 var(--sp-3);"></p>
+      <div class="field">
+        <label>Cargo</label>
+        <select id="invite-role" class="input"></select>
+      </div>
+      <div id="invite-province-field" class="field" style="display:none;">
+        <label>Província (âmbito)</label>
+        <select id="invite-province" class="input"></select>
+      </div>
+      <div id="invite-municipality-field" class="field" style="display:none;">
+        <label>Município (âmbito)</label>
+        <select id="invite-municipality" class="input"></select>
+      </div>
+      <button id="btn-invite" class="btn btn-primary">✉️ Convidar</button>
+      <p id="invite-msg" class="msg"></p>
+
+      <p class="lead" style="margin:var(--sp-5) 0 var(--sp-3);">Importar moradas (CSV)</p>
+      <p style="font-size:11.5px;color:var(--text-faint);margin:0 0 var(--sp-2);">O ficheiro precisa das colunas: latitude,longitude,house_number,reference</p>
+      <input id="import-file" class="input" type="file" accept=".csv" style="padding:10px;" />
+      <button id="btn-import" class="btn btn-secondary" style="margin-top:var(--sp-2);">📥 Importar CSV</button>
+      <p id="import-msg" class="msg"></p>
+
+      <p class="lead" style="margin:var(--sp-5) 0 var(--sp-3);">Exportar moradas</p>
+      <div class="btn-row">
+        <button id="btn-export-csv" class="btn btn-secondary btn-sm">Exportar CSV</button>
+        <button id="btn-export-geojson" class="btn btn-secondary btn-sm">Exportar GeoJSON</button>
+      </div>
+      <p id="export-msg" class="msg"></p>
+
+      <p class="lead" style="margin:var(--sp-5) 0 var(--sp-3);">Entregas por atribuir</p>
+      <div id="unassigned-list" class="stack-sm"></div>
+      <div id="unassigned-empty" class="empty-state" style="display:none;">
+        <div class="desc" style="margin:0;">Nada por atribuir de momento.</div>
+      </div>
+
+      <p class="lead" style="margin:var(--sp-5) 0 var(--sp-3);">Auditoria recente</p>
+      <div id="audit-list" class="stack-sm"></div>
+      <div id="audit-empty" class="empty-state" style="display:none;">
+        <div class="desc" style="margin:0;">Sem registos de auditoria ainda.</div>
+      </div>
+    </div>
+
+    <div id="panel-definicoes" class="panel">
+      <div class="stack">
+        <div>
+          <p class="lead" style="margin-bottom:var(--sp-3);">Notificações</p>
+          <div id="notifications-list" class="stack-sm"></div>
+          <div id="notifications-empty" class="empty-state" style="display:none;"><div class="desc" style="margin:0;">Sem notificações.</div></div>
+        </div>
+
+        <div>
+          <p class="lead" style="margin-bottom:var(--sp-3);">Verificação em dois passos (admins)</p>
+          <div id="mfa-not-enrolled">
+            <button id="btn-mfa-start" class="btn btn-secondary">🔒 Ativar verificação em dois passos</button>
+          </div>
+          <div id="mfa-enroll-box" style="display:none;">
+            <div id="mfa-qr" class="qr-box"></div>
+            <p style="font-size:11.5px;color:var(--text-dim);margin:var(--sp-2) 0;">Digitaliza com o Google Authenticator. Se não conseguires ler o código, escolhe "Introduzir chave de configuração" na app e cola este código:</p>
+            <div id="mfa-secret" class="value-md" style="background:#1a2436;padding:10px;border-radius:8px;word-break:break-all;margin-bottom:var(--sp-2);"></div>
+            <input id="mfa-code" class="input" type="text" placeholder="Código de 6 dígitos" style="margin-bottom:var(--sp-2);" />
+            <button id="btn-mfa-verify" class="btn btn-primary">Confirmar</button>
+          </div>
+          <p id="mfa-msg" class="msg"></p>
+        </div>
+
+        <div>
+          <p class="lead" style="margin-bottom:var(--sp-3);">Modo offline</p>
+          <p id="offline-status" class="msg msg-muted" style="margin:0 0 var(--sp-2);">A verificar...</p>
+          <button id="btn-sync-pending" class="btn btn-secondary" style="display:none;">🔄 Sincronizar agora</button>
+        </div>
+
+        <button id="btn-apagar-historico" class="btn btn-secondary">🗑️ Apagar histórico de pesquisas</button>
+        <p id="definicoes-msg" class="msg"></p>
+        <button id="btn-logout" class="btn btn-danger-outline">Terminar sessão</button>
+      </div>
+    </div>
+
+    <div id="bottom-nav" class="tab-bar">
+      <button class="tab-btn al-tab active" data-tab="mapa"><span class="ic">🗺️</span>Mapa</button>
+      <button class="tab-btn al-tab" data-tab="guardados"><span class="ic">🔖</span>Guardados</button>
+      <button class="tab-btn al-tab" data-tab="entrega"><span class="ic">📦</span>Entrega</button>
+      <button id="tab-btn-minhas-entregas" class="tab-btn al-tab" data-tab="minhas-entregas" style="display:none;"><span class="ic">🚚</span>Entregas</button>
+      <button id="tab-btn-campo" class="tab-btn al-tab" data-tab="campo" style="display:none;"><span class="ic">🧭</span>Campo</button>
+      <button id="tab-btn-validar" class="tab-btn al-tab" data-tab="validar" style="display:none;"><span class="ic">✅</span>Validar</button>
+      <button id="tab-btn-admin" class="tab-btn al-tab" data-tab="admin" style="display:none;"><span class="ic">🛡️</span>Admin</button>
+      <button class="tab-btn al-tab" data-tab="definicoes"><span class="ic">⚙️</span>Definições</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
+<script>
+var SUPABASE_URL = "https://qntbknegicaghnbnghyw.supabase.co";
+var ANON_KEY = "sb_publishable_9RypatlYEYRmx8kRnyNS-A_ZRLMgl_a";
+var session = null;
+var lastLocation = null;
+var lastAddressId = null;
+var isAdmin = false;
+var mode = "signin";
+
+function encodeOLC(lat, lng) {
+  var ALPHABET = '23456789CFGHJMPQRVWX';
+  var RES = [20.0, 1.0, 0.05, 0.0025, 0.000125];
+  lat = Math.min(90, Math.max(-90, lat));
+  if (lat === 90) lat -= 0.000000001;
+  var lng2 = lng;
+  while (lng2 < -180) lng2 += 360;
+  while (lng2 >= 180) lng2 -= 360;
+  var latVal = lat + 90, lngVal = lng2 + 180, code = '';
+  for (var i = 0; i < 5; i++) {
+    var latDigit = Math.floor(latVal / RES[i]); latVal -= latDigit * RES[i]; code += ALPHABET[latDigit];
+    var lngDigit = Math.floor(lngVal / RES[i]); lngVal -= lngDigit * RES[i]; code += ALPHABET[lngDigit];
+    if (i === 3) code += '+';
+  }
+  return code;
+}
+
+var tabSignin = document.getElementById('tab-signin');
+var tabSignup = document.getElementById('tab-signup');
+var btnSubmit = document.getElementById('btn-submit');
+var authMsg = document.getElementById('auth-msg');
+
+function setMode(m) {
+  mode = m;
+  tabSignin.classList.toggle('active', m === 'signin');
+  tabSignup.classList.toggle('active', m === 'signup');
+  btnSubmit.textContent = m === 'signin' ? 'Entrar' : 'Criar conta';
+  authMsg.textContent = ''; authMsg.className = 'msg';
+}
+tabSignin.addEventListener('click', function() { setMode('signin'); });
+tabSignup.addEventListener('click', function() { setMode('signup'); });
+
+function showApp() {
+  document.getElementById('view-login').classList.remove('visible');
+  document.getElementById('view-app').classList.add('visible');
+  document.getElementById('session-label').textContent = 'ANGOLA · ' + session.email;
+  loadFavorites();
+  checkAdmin();
+  checkRoles();
+  updateOfflineStatus();
+  syncPendingOps();
+}
+
+function parseJwt(token) {
+  try {
+    var payload = token.split('.')[1];
+    var json = decodeURIComponent(atob(payload.replace(/-/g, '+').replace(/_/g, '/')).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(json);
+  } catch (e) { return {}; }
+}
+
+var myRoles = [];
+function checkRoles() {
+  fetch(SUPABASE_URL + '/rest/v1/organization_members?select=role', {
+    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+  }).then(function(r) { return r.json(); }).then(function(rows) {
+    myRoles = (rows || []).map(function(r) { return r.role; });
+    document.getElementById('tab-btn-minhas-entregas').style.display = myRoles.indexOf('estafeta') > -1 ? 'flex' : 'none';
+    document.getElementById('tab-btn-campo').style.display = myRoles.indexOf('tecnico_campo') > -1 ? 'flex' : 'none';
+    var validaRoles = ['supervisor', 'admin_nacional', 'admin_provincial', 'admin_municipal', 'super_admin'];
+    var canValidate = myRoles.some(function(r) { return validaRoles.indexOf(r) > -1; });
+    document.getElementById('tab-btn-validar').style.display = canValidate ? 'flex' : 'none';
+  }).catch(function() {});
+}
+
+btnSubmit.addEventListener('click', function() {
+  var email = document.getElementById('input-email').value.trim();
+  var password = document.getElementById('input-password').value;
+  if (!email || !password) { authMsg.className = 'msg msg-error'; authMsg.textContent = 'Preenche o email e a palavra-passe.'; return; }
+  btnSubmit.disabled = true; btnSubmit.textContent = 'A processar...';
+  var endpoint = mode === 'signin' ? SUPABASE_URL + '/auth/v1/token?grant_type=password' : SUPABASE_URL + '/auth/v1/signup';
+  fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY }, body: JSON.stringify({ email: email, password: password }) })
+    .then(function(r) { return r.json().then(function(data) { return { status: r.status, data: data }; }); })
+    .then(function(res) {
+      btnSubmit.disabled = false; setMode(mode);
+      if (res.status >= 400) { authMsg.className = 'msg msg-error'; authMsg.textContent = res.data.msg || res.data.error_description || 'Erro ao processar.'; return; }
+      if (mode === 'signup' && !res.data.access_token) { authMsg.className = 'msg msg-success'; authMsg.textContent = 'Conta criada! Confirma o email antes de entrares.'; return; }
+      var pendingSession = { access_token: res.data.access_token, email: (res.data.user && res.data.user.email) || email };
+
+      if (mode === 'signin') {
+        fetch(SUPABASE_URL + '/auth/v1/user', {
+          headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + pendingSession.access_token }
+        }).then(function(r) { return r.json(); }).then(function(userData) {
+          var factors = (userData && userData.factors) || [];
+          var verifiedFactor = factors.find(function(f) { return f.status === 'verified'; });
+          if (!verifiedFactor) { session = pendingSession; showApp(); return; }
+
+          pendingMfaFactorId = verifiedFactor.id;
+          session = pendingSession;
+          fetch(SUPABASE_URL + '/auth/v1/factors/' + verifiedFactor.id + '/challenge', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + pendingSession.access_token }
+          }).then(function(r) { return r.json(); }).then(function(challenge) {
+            pendingMfaChallengeId = challenge.id;
+            document.getElementById('view-login').classList.remove('visible');
+            document.getElementById('view-mfa-login').classList.add('visible');
+          });
+        }).catch(function() { session = pendingSession; showApp(); });
+      } else {
+        session = pendingSession;
+        showApp();
+      }
+    }).catch(function(e) { btnSubmit.disabled = false; setMode(mode); authMsg.className = 'msg msg-error'; authMsg.textContent = 'Erro de ligação: ' + e.message; });
+});
+
+var pendingMfaFactorId = null, pendingMfaChallengeId = null;
+document.getElementById('btn-mfa-login-verify').addEventListener('click', function() {
+  var code = document.getElementById('mfa-login-code').value.trim();
+  var msg = document.getElementById('mfa-login-msg');
+  if (!code) { msg.className = 'msg msg-error'; msg.textContent = 'Introduz o código.'; return; }
+  msg.className = 'msg msg-muted'; msg.textContent = 'A verificar...';
+  fetch(SUPABASE_URL + '/auth/v1/factors/' + pendingMfaFactorId + '/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+    body: JSON.stringify({ challenge_id: pendingMfaChallengeId, code: code })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.error || data.error_description || !data.access_token) {
+      msg.className = 'msg msg-error'; msg.textContent = data.error_description || data.msg || 'Código inválido.'; return;
+    }
+    session.access_token = data.access_token;
+    document.getElementById('view-mfa-login').classList.remove('visible');
+    document.getElementById('mfa-login-code').value = ''; msg.textContent = '';
+    showApp();
+  }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
+});
+
+// ---- Notificações ----
+function loadNotifications() {
+  if (!session) return;
+  var myId = parseJwt(session.access_token).sub;
+  var list = document.getElementById('notifications-list');
+  var empty = document.getElementById('notifications-empty');
+  list.innerHTML = '<p class="msg msg-muted">A carregar...</p>';
+  empty.style.display = 'none';
+
+  fetch(SUPABASE_URL + '/rest/v1/notifications?user_id=eq.' + myId + '&select=*&order=created_at.desc&limit=20', {
+    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+  }).then(function(r) { return r.json(); }).then(function(rows) {
+    list.innerHTML = '';
+    if (!rows || rows.length === 0) { empty.style.display = 'block'; return; }
+    rows.forEach(function(n) {
+      var div = document.createElement('div');
+      div.className = 'list-item';
+      div.style.opacity = n.read_at ? '0.6' : '1';
+      div.innerHTML = '<div class="value-plain">' + n.title + '</div>' +
+        (n.body ? '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">' + n.body + '</div>' : '') +
+        '<div style="font-size:10.5px;color:var(--text-faint);margin-top:4px;">' + new Date(n.created_at).toLocaleString('pt-PT') + '</div>';
+      if (!n.read_at) {
+        div.style.cursor = 'pointer';
+        div.addEventListener('click', function() {
+          fetch(SUPABASE_URL + '/rest/v1/notifications?id=eq.' + n.id, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+            body: JSON.stringify({ read_at: new Date().toISOString() })
+          }).then(function() { loadNotifications(); });
+        });
+      }
+      list.appendChild(div);
+    });
+  }).catch(function() { list.innerHTML = '<p class="msg msg-error">Erro ao carregar.</p>'; });
+}
+
+// ---- MFA (verificação em dois passos) ----
+var mfaFactorId = null, mfaChallengeId = null;
+
+document.getElementById('btn-mfa-start').addEventListener('click', function() {
+  var msg = document.getElementById('mfa-msg');
+  msg.className = 'msg msg-muted'; msg.textContent = 'A preparar...';
+
+  fetch(SUPABASE_URL + '/auth/v1/user', {
+    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+  }).then(function(r) { return r.json(); }).then(function(userData) {
+    var list = (userData && userData.factors) || [];
+    var verified = list.find(function(f) { return f.status === 'verified'; });
+    if (verified) {
+      msg.className = 'msg msg-success';
+      msg.textContent = 'Já tens a verificação em dois passos ativa nesta conta.';
+      return Promise.reject('already-verified');
+    }
+    var unverified = list.filter(function(f) { return f.status !== 'verified'; });
+    return Promise.all(unverified.map(function(f) {
+      return fetch(SUPABASE_URL + '/auth/v1/factors/' + f.id, {
+        method: 'DELETE',
+        headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+      }).catch(function() { /* se falhar a apagar um antigo, ainda tentamos criar o novo */ });
+    }));
+  }).catch(function(e) {
+    if (e === 'already-verified') throw e;
+    return null; // falhou a verificar/limpar fatores antigos - avança na mesma para tentar criar
+  }).then(function() {
+    return fetch(SUPABASE_URL + '/auth/v1/factors', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+      body: JSON.stringify({ factor_type: 'totp', friendly_name: 'Angola Localiza ' + Date.now(), issuer: 'Angola Localiza' })
+    });
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.error || data.error_description || data.msg || !data.id) {
+      msg.className = 'msg msg-error';
+      msg.textContent = data.error_description || data.msg || data.error || 'Erro ao criar fator.';
+      return;
+    }
+    mfaFactorId = data.id;
+    var qrBox = document.getElementById('mfa-qr');
+    qrBox.innerHTML = '';
+    var qrContent = (data.totp && (data.totp.qr_code || data.totp.uri)) || '';
+    if (qrContent.indexOf('<svg') === 0) {
+      qrBox.innerHTML = qrContent;
+    } else if (qrContent) {
+      try {
+        new QRCode(qrBox, { text: qrContent, width: 160, height: 160, colorDark: '#101826', colorLight: '#ffffff' });
+      } catch (qrErr) {
+        qrBox.innerHTML = '<p style="color:#333;font-size:11px;padding:8px;">Não foi possível desenhar o QR — usa a chave manual abaixo.</p>';
+      }
+    } else {
+      qrBox.innerHTML = '<p style="color:#333;font-size:11px;padding:8px;">Sem QR — usa a chave manual abaixo na app.</p>';
+    }
+    document.getElementById('mfa-secret').textContent = (data.totp && data.totp.secret) || JSON.stringify(data).slice(0, 200);
+    document.getElementById('mfa-not-enrolled').style.display = 'none';
+    document.getElementById('mfa-enroll-box').style.display = 'block';
+    msg.textContent = '';
+
+    return fetch(SUPABASE_URL + '/auth/v1/factors/' + mfaFactorId + '/challenge', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+    });
+  }).then(function(r) { return r && r.json(); }).then(function(challenge) {
+    if (challenge && challenge.id) mfaChallengeId = challenge.id;
+  }).catch(function(e) {
+    if (e === 'already-verified') return;
+    msg.className = 'msg msg-error'; msg.textContent = 'Erro: ' + (e && e.message ? e.message : String(e));
+  });
+});
+
+document.getElementById('btn-mfa-verify').addEventListener('click', function() {
+  var code = document.getElementById('mfa-code').value.trim();
+  var msg = document.getElementById('mfa-msg');
+  if (!code || !mfaFactorId || !mfaChallengeId) { msg.className = 'msg msg-error'; msg.textContent = 'Falta o código ou o processo não foi iniciado corretamente.'; return; }
+  msg.className = 'msg msg-muted'; msg.textContent = 'A verificar...';
+  fetch(SUPABASE_URL + '/auth/v1/factors/' + mfaFactorId + '/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+    body: JSON.stringify({ challenge_id: mfaChallengeId, code: code })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.error || data.error_description) { msg.className = 'msg msg-error'; msg.textContent = data.error_description || data.msg || 'Código inválido.'; return; }
+    msg.className = 'msg msg-success'; msg.textContent = 'Verificação em dois passos ativada!';
+    document.getElementById('mfa-enroll-box').style.display = 'none';
+  }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
+});
+
+// ---- Modo offline (fila local + sincronização real) ----
+var DEVICE_ID = (function() {
+  var id = localStorage.getItem('al_device_id');
+  if (!id) { id = 'web-' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('al_device_id', id); }
+  return id;
+})();
+
+function getPendingOps() {
+  try { return JSON.parse(localStorage.getItem('al_pending_ops') || '[]'); } catch (e) { return []; }
+}
+function savePendingOps(ops) { localStorage.setItem('al_pending_ops', JSON.stringify(ops)); }
+function queuePendingOp(operationType, payload) {
+  var ops = getPendingOps();
+  ops.push({ operation_id: crypto.randomUUID(), device_id: DEVICE_ID, operation_type: operationType, payload: payload });
+  savePendingOps(ops);
+  updateOfflineStatus();
+}
+
+function updateOfflineStatus() {
+  var statusEl = document.getElementById('offline-status');
+  var btnSync = document.getElementById('btn-sync-pending');
+  if (!statusEl) return;
+  var pending = getPendingOps();
+  if (!navigator.onLine) {
+    statusEl.className = 'msg msg-error'; statusEl.textContent = 'Sem ligação — ' + pending.length + ' operação(ões) por sincronizar.';
+    btnSync.style.display = 'none';
+  } else if (pending.length > 0) {
+    statusEl.className = 'msg msg-muted'; statusEl.textContent = pending.length + ' operação(ões) por sincronizar.';
+    btnSync.style.display = 'block';
+  } else {
+    statusEl.className = 'msg msg-success'; statusEl.textContent = 'Tudo sincronizado.';
+    btnSync.style.display = 'none';
+  }
+}
+
+function syncPendingOps() {
+  if (!session) return;
+  var ops = getPendingOps();
+  if (ops.length === 0) { updateOfflineStatus(); return; }
+  fetch(SUPABASE_URL + '/functions/v1/sync', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+    body: JSON.stringify({ operations: ops })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    var results = data.results || [];
+    var stillPending = ops.filter(function(op) {
+      var result = results.find(function(r) { return r.operation_id === op.operation_id; });
+      return result && result.status === 'FAILED' && /ligação|network/i.test(result.error || '') ; // só mantém se falhou por rede
+    });
+    // Remove tudo o que foi SYNCED ou CONFLICT (esses já ficaram registados no servidor)
+    var reallyPending = ops.filter(function(op) {
+      var result = results.find(function(r) { return r.operation_id === op.operation_id; });
+      return !result || result.status === 'FAILED';
+    });
+    savePendingOps(reallyPending);
+    updateOfflineStatus();
+    if (document.getElementById('panel-guardados').classList.contains('visible')) loadFavorites();
+  }).catch(function() { /* continua offline, mantém a fila */ });
+}
+
+window.addEventListener('online', function() { updateOfflineStatus(); syncPendingOps(); });
+window.addEventListener('offline', updateOfflineStatus);
+document.getElementById('btn-sync-pending').addEventListener('click', syncPendingOps);
+
+document.getElementById('btn-apagar-historico').addEventListener('click', function() {
+  if (!session) return;
+  var msg = document.getElementById('definicoes-msg');
+  msg.className = 'msg msg-muted'; msg.textContent = 'A apagar...';
+  var myId = parseJwt(session.access_token).sub;
+  fetch(SUPABASE_URL + '/rest/v1/search_history?user_id=eq.' + myId, {
+    method: 'DELETE',
+    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+  }).then(function(r) {
+    if (r.ok) { msg.className = 'msg msg-success'; msg.textContent = 'Histórico apagado.'; }
+    else { msg.className = 'msg msg-error'; msg.textContent = 'Erro ao apagar.'; }
+  }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
+});
+
+document.getElementById('btn-logout').addEventListener('click', function() {
+  session = null; lastAddressId = null; isAdmin = false; myRoles = [];
+  document.getElementById('tab-btn-admin').style.display = 'none';
+  document.getElementById('tab-btn-minhas-entregas').style.display = 'none';
+  document.getElementById('tab-btn-campo').style.display = 'none';
+  document.getElementById('tab-btn-validar').style.display = 'none';
+  document.getElementById('view-app').classList.remove('visible');
+  document.getElementById('view-mfa-login').classList.remove('visible');
+  document.getElementById('view-login').classList.add('visible');
+  document.getElementById('session-label').textContent = 'ANGOLA · sem sessão';
+  document.getElementById('input-email').value = ''; document.getElementById('input-password').value = '';
+});
+
+document.querySelectorAll('.al-tab').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.al-tab').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('visible'); });
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('visible');
+    if (btn.dataset.tab === 'guardados') loadFavorites();
+    if (btn.dataset.tab === 'entrega') loadEntregaDestinos();
+    if (btn.dataset.tab === 'admin') loadAdmin();
+    if (btn.dataset.tab === 'minhas-entregas') loadMinhasEntregas();
+    if (btn.dataset.tab === 'campo') { campoLoadDailyCount(); campoUpdateOfflineMini(); campoLoadBairros(); }
+    if (btn.dataset.tab === 'validar') loadValidar();
+    if (btn.dataset.tab === 'definicoes') { loadNotifications(); updateOfflineStatus(); }
+  });
+});
+
+var btn = document.getElementById('btn-locate');
+var errMsg = document.getElementById('err-msg');
+var resultBox = document.getElementById('result');
+var mapInstance = null;
+
+btn.addEventListener('click', function() {
+  errMsg.style.display = 'none';
+  if (!navigator.geolocation) { errMsg.textContent = 'Este dispositivo não suporta GPS.'; errMsg.style.display = 'block'; return; }
+  btn.textContent = 'A localizar...';
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    btn.innerHTML = '📍 Atualizar localização';
+    var lat = pos.coords.latitude, lng = pos.coords.longitude, acc = Math.round(pos.coords.accuracy);
+    var olc = encodeOLC(lat, lng);
+    lastLocation = { lat: lat, lng: lng, plus_code: olc, accuracy: acc, postal_code: null, province_name: null };
+
+    document.getElementById('olc-value').textContent = olc;
+    document.getElementById('accuracy-value').textContent = acc + ' m';
+    document.getElementById('coords-value').textContent = lat.toFixed(5) + ', ' + lng.toFixed(5);
+    document.getElementById('postal-value').textContent = 'a calcular...';
+    document.getElementById('province-value').textContent = 'a identificar...';
+    document.getElementById('save-msg').textContent = '';
+    resultBox.style.display = 'block';
+
+    if (!mapInstance) {
+      mapInstance = L.map('map', { zoomControl: true, attributionControl: false }).setView([lat, lng], 16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance);
+      L.circleMarker([lat, lng], { radius: 8, color: '#f2790f', fillColor: '#f2790f', fillOpacity: 1 }).addTo(mapInstance);
+    } else { mapInstance.setView([lat, lng], 16); }
+    setTimeout(function() { if (mapInstance) mapInstance.invalidateSize(); }, 200);
+
+    var qrContainer = document.getElementById('qr-code');
+    qrContainer.innerHTML = '';
+    new QRCode(qrContainer, {
+      text: 'https://www.google.com/maps?q=' + lat + ',' + lng,
+      width: 140, height: 140,
+      colorDark: '#101826', colorLight: '#ffffff'
+    });
+
+    fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng + '&format=json&addressdetails=1')
+      .then(function(r) { return r.json(); })
+      .then(function(geo) {
+        var addr = geo.address || {};
+        var province = addr.state || addr.region || addr.county || null;
+        var municipality = addr.city || addr.town || addr.municipality || addr.county || null;
+        lastLocation.province_name = province;
+        lastLocation.municipality_name = municipality;
+        document.getElementById('province-value').textContent = province || 'não identificada';
+        return fetch(SUPABASE_URL + '/functions/v1/generate-postal-code', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY },
+          body: JSON.stringify({ latitude: lat, longitude: lng, province_name: province })
+        });
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        document.getElementById('postal-value').textContent = data.postal_code || 'erro';
+        lastLocation.postal_code = data.postal_code;
+      }).catch(function() {
+        document.getElementById('province-value').textContent = 'erro ao identificar';
+        document.getElementById('postal-value').textContent = 'erro de ligação';
+      });
+  }, function(err) {
+    btn.innerHTML = '📍 Obter a minha localização';
+    errMsg.textContent = 'Não foi possível obter a localização (' + err.message + ').';
+    errMsg.style.display = 'block';
+  }, { enableHighAccuracy: true, timeout: 10000 });
+});
+
+// ---- Scanner de QR ----
+var scannerStream = null;
+document.getElementById('btn-scan-qr').addEventListener('click', function() {
+  document.getElementById('scanner-box').style.display = 'block';
+  document.getElementById('scan-result').textContent = '';
+  var video = document.getElementById('scanner-video');
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function(stream) {
+    scannerStream = stream;
+    video.srcObject = stream;
+    video.setAttribute('playsinline', true);
+    video.play();
+    requestAnimationFrame(scanFrame);
+  }).catch(function(err) {
+    document.getElementById('scan-result').className = 'msg msg-error';
+    document.getElementById('scan-result').textContent = 'Não foi possível aceder à câmara: ' + err.message;
+    document.getElementById('scanner-box').style.display = 'none';
+  });
+
+  var canvas = document.createElement('canvas');
+  var ctx = canvas.getContext('2d');
+  function scanFrame() {
+    if (!scannerStream) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      var code = jsQR(imageData.data, imageData.width, imageData.height);
+      if (code) {
+        stopScanner();
+        var resultEl = document.getElementById('scan-result');
+        resultEl.className = 'msg msg-success';
+        resultEl.textContent = 'Lido: ' + code.data;
+        if (/^https?:\/\//.test(code.data)) {
+          window.open(code.data, '_blank');
+        }
+        return;
+      }
+    }
+    requestAnimationFrame(scanFrame);
+  }
+});
+
+function stopScanner() {
+  if (scannerStream) { scannerStream.getTracks().forEach(function(t) { t.stop(); }); scannerStream = null; }
+  document.getElementById('scanner-box').style.display = 'none';
+}
+document.getElementById('btn-scan-cancelar').addEventListener('click', stopScanner);
+
+document.getElementById('btn-save-favorite').addEventListener('click', function() {
+  if (!session || !lastLocation) return;
+  var saveMsg = document.getElementById('save-msg');
+
+  if (!navigator.onLine) {
+    queuePendingOp('create_address', {
+      latitude: lastLocation.lat, longitude: lastLocation.lng,
+      location: 'SRID=4326;POINT(' + lastLocation.lng + ' ' + lastLocation.lat + ')',
+      plus_code: lastLocation.plus_code, postal_code: lastLocation.postal_code,
+      visibility_level: document.getElementById('favorite-visibility').value,
+      status: 'PROPOSED', source: 'app'
+    });
+    saveMsg.className = 'msg msg-success';
+    saveMsg.textContent = 'Sem ligação — guardado no telemóvel, vai sincronizar automaticamente quando a internet voltar.';
+    return;
+  }
+
+  saveMsg.className = 'msg msg-muted'; saveMsg.textContent = 'A guardar...';
+
+  var provinceLookup = lastLocation.province_name
+    ? fetch(SUPABASE_URL + '/rest/v1/provinces?name=ilike.' + encodeURIComponent(lastLocation.province_name) + '&select=id', {
+        headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+      }).then(function(r) { return r.json(); }).then(function(rows) { return (rows && rows[0]) ? rows[0].id : null; }).catch(function() { return null; })
+    : Promise.resolve(null);
+
+  provinceLookup.then(function(provinceId) {
+    var municipalityLookup = (provinceId && lastLocation.municipality_name)
+      ? fetch(SUPABASE_URL + '/rest/v1/municipalities?province_id=eq.' + provinceId + '&name=ilike.*' + encodeURIComponent(lastLocation.municipality_name) + '*&select=id', {
+          headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+        }).then(function(r) { return r.json(); }).then(function(rows) { return (rows && rows[0]) ? rows[0].id : null; }).catch(function() { return null; })
+      : Promise.resolve(null);
+
+    return municipalityLookup.then(function(municipalityId) {
+      return fetch(SUPABASE_URL + '/rest/v1/addresses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token, 'Prefer': 'return=representation' },
+        body: JSON.stringify({
+          latitude: lastLocation.lat, longitude: lastLocation.lng,
+          location: 'SRID=4326;POINT(' + lastLocation.lng + ' ' + lastLocation.lat + ')',
+          plus_code: lastLocation.plus_code, postal_code: lastLocation.postal_code,
+          province_id: provinceId, municipality_id: municipalityId,
+          visibility_level: document.getElementById('favorite-visibility').value,
+          status: 'PROPOSED', source: 'app'
+        })
+      });
+    });
+  }).then(function(r) { return r.json(); }).then(function(rows) {
+    var addr = rows[0];
+    if (!addr) { saveMsg.className = 'msg msg-error'; saveMsg.textContent = 'Erro ao guardar a morada.'; return; }
+    lastAddressId = addr.id;
+    return fetch(SUPABASE_URL + '/rest/v1/favorites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token, 'Prefer': 'return=representation' },
+      body: JSON.stringify({ address_id: addr.id, category: document.getElementById('favorite-category').value })
+    });
+  }).then(function(r) { return r && r.json(); }).then(function() {
+    saveMsg.className = 'msg msg-success'; saveMsg.textContent = 'Guardado! Já podes criar uma entrega para este local.';
+  }).catch(function() {
+    queuePendingOp('create_address', {
+      latitude: lastLocation.lat, longitude: lastLocation.lng,
+      location: 'SRID=4326;POINT(' + lastLocation.lng + ' ' + lastLocation.lat + ')',
+      plus_code: lastLocation.plus_code, postal_code: lastLocation.postal_code,
+      visibility_level: document.getElementById('favorite-visibility').value,
+      status: 'PROPOSED', source: 'app'
+    });
+    saveMsg.className = 'msg msg-success';
+    saveMsg.textContent = 'Ligação instável — guardado no telemóvel, vai sincronizar automaticamente.';
+  });
+});
+
+// ---- Pesquisa (Fase 7, agora ligada ao ecrã) ----
+var searchTimer = null;
+document.getElementById('search-input').addEventListener('input', function() {
+  var q = this.value.trim();
+  clearTimeout(searchTimer);
+  var resultsBox = document.getElementById('search-results');
+  if (q.length < 3) { resultsBox.innerHTML = ''; return; }
+  searchTimer = setTimeout(function() {
+    resultsBox.innerHTML = '<p class="msg msg-muted">A pesquisar...</p>';
+    fetch(SUPABASE_URL + '/functions/v1/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + (session ? session.access_token : ANON_KEY) },
+      body: JSON.stringify({ query: q, user_id: session ? parseJwt(session.access_token).sub : null })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      resultsBox.innerHTML = '';
+      var results = data.results || [];
+      if (results.length === 0) { resultsBox.innerHTML = '<p class="msg msg-muted">Sem resultados.</p>'; return; }
+      results.slice(0, 8).forEach(function(r) {
+        var div = document.createElement('div');
+        div.className = 'list-item';
+        var title = r.postal_code || r.name || r.reference || 'resultado';
+        var subtitle = r.kind || r.status || '';
+        div.innerHTML = '<div class="value-plain">' + title + '</div><div style="font-size:11.5px;color:var(--text-dim);">' + subtitle + '</div>';
+        if (r.latitude && r.longitude) {
+          div.style.cursor = 'pointer';
+          div.addEventListener('click', function() {
+            if (mapInstance) { mapInstance.setView([r.latitude, r.longitude], 17); }
+          });
+        }
+        resultsBox.appendChild(div);
+      });
+    }).catch(function() { resultsBox.innerHTML = '<p class="msg msg-error">Erro na pesquisa.</p>'; });
+  }, 400);
+});
+
+function loadFavorites() {
+  if (!session) return;
+  var list = document.getElementById('favorites-list');
+  var empty = document.getElementById('favorites-empty');
+  list.innerHTML = '<p class="msg msg-muted">A carregar...</p>';
+  empty.style.display = 'none';
+
+  fetch(SUPABASE_URL + '/rest/v1/favorites?select=id,category,created_at,address_id,addresses(postal_code,plus_code,latitude,longitude,reference,provinces(name),municipalities(name))&order=created_at.desc', {
+    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+  }).then(function(r) { return r.json(); }).then(function(rows) {
+    list.innerHTML = '';
+    if (!rows || rows.length === 0) { empty.style.display = 'block'; return; }
+    if (!lastAddressId && rows[0]) lastAddressId = rows[0].address_id;
+    rows.forEach(function(fav) {
+      var addr = fav.addresses || {};
+      var place = [addr.municipalities && addr.municipalities.name, addr.provinces && addr.provinces.name].filter(Boolean).join(', ');
+      var div = document.createElement('div');
+      div.className = 'list-item';
+      div.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">' +
+        '<div>' +
+        '<div class="value-md" style="color:var(--accent);font-weight:600;">' + (addr.postal_code || addr.plus_code || 'sem código') + '</div>' +
+        '<div style="font-size:11.5px;color:var(--text-dim);margin-top:3px;">' + (place || (addr.latitude ? addr.latitude.toFixed(4) + ', ' + addr.longitude.toFixed(4) : '')) + ' · ' + fav.category + '</div>' +
+        '</div>' +
+        '<button data-id="' + fav.id + '" class="fav-delete-btn icon-btn" aria-label="Apagar">🗑️</button>' +
+        '</div>';
+      list.appendChild(div);
+    });
+    document.querySelectorAll('.fav-delete-btn').forEach(function(b) {
+      b.addEventListener('click', function() {
+        fetch(SUPABASE_URL + '/rest/v1/favorites?id=eq.' + b.dataset.id, {
+          method: 'DELETE',
+          headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+        }).then(function() { loadFavorites(); });
+      });
+    });
+  }).catch(function() { list.innerHTML = '<p class="msg msg-error">Erro ao carregar.</p>'; });
+}
+
+function loadEntregaDestinos() {
+  if (!session) return;
+  var sel = document.getElementById('entrega-destino');
+  sel.innerHTML = '<option value="">A carregar...</option>';
+  fetch(SUPABASE_URL + '/rest/v1/favorites?select=address_id,addresses(postal_code,plus_code,reference,status,flagged_for_review,municipality_id,province_id)&order=created_at.desc', {
+    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+  }).then(function(r) { return r.json(); }).then(function(rows) {
+    entregaDestinosCache = {};
+    var opts = '<option value="">Escolhe um local guardado...</option>';
+    (rows || []).forEach(function(f) {
+      var addr = f.addresses || {};
+      entregaDestinosCache[f.address_id] = addr;
+      var label = (addr.postal_code || addr.plus_code || 'sem código') + (addr.reference ? ' — ' + addr.reference : '');
+      opts += '<option value="' + f.address_id + '">' + label + '</option>';
+    });
+    if ((rows || []).length === 0) opts = '<option value="">Sem locais guardados — vai ao Mapa primeiro</option>';
+    sel.innerHTML = opts;
+  }).catch(function() { sel.innerHTML = '<option value="">Erro ao carregar</option>'; });
+}
+var entregaDestinosCache = {};
+document.getElementById('entrega-destino').addEventListener('change', function() {
+  var addr = entregaDestinosCache[this.value];
+  var banner = document.getElementById('entrega-risco-banner');
+  var risky = addr && (addr.status === 'PROPOSED' || addr.flagged_for_review);
+  banner.style.display = risky ? 'block' : 'none';
+  document.getElementById('btn-criar-entrega').disabled = !this.value;
+});
+
+document.getElementById('btn-criar-entrega').addEventListener('click', function() {
+  var addressId = document.getElementById('entrega-destino').value;
+  if (!session || !addressId) return;
+  var nome = document.getElementById('entrega-nome').value.trim();
+  var contacto = document.getElementById('entrega-contacto').value.trim();
+  var nota = document.getElementById('entrega-nota').value.trim();
+  var msg = document.getElementById('entrega-msg');
+  if (!nome) { msg.className = 'msg msg-error'; msg.textContent = 'O nome de quem recebe é obrigatório.'; return; }
+  msg.className = 'msg msg-muted'; msg.textContent = 'A localizar o ponto de partida...';
+
+  var destino = entregaDestinosCache[addressId] || {};
+
+  function determineZone(originMunicipalityId, originProvinceId) {
+    if (destino.municipality_id && originMunicipalityId === destino.municipality_id) return 'A';
+    if (destino.province_id && originProvinceId === destino.province_id) return 'C';
+    return 'B';
+  }
+
+  function proceed(origin) {
+    msg.textContent = 'A criar...';
+    var zoneCode = determineZone(origin.municipality_id, origin.province_id);
+
+    fetch(SUPABASE_URL + '/rest/v1/deliveries?select=*,addresses(latitude,longitude,postal_code,plus_code,reference)', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token, 'Prefer': 'return=representation' },
+      body: JSON.stringify({
+        address_id: addressId, recipient_name: nome, recipient_phone: contacto || null, instructions: nota || null,
+        origin_latitude: origin.lat || null, origin_longitude: origin.lng || null,
+        origin_municipality_id: origin.municipality_id || null, origin_province_id: origin.province_id || null,
+        zone_code: zoneCode
+      })
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      var delivery = rows[0];
+      if (!delivery) { msg.className = 'msg msg-error'; msg.textContent = 'Erro ao criar a entrega.'; return; }
+      document.getElementById('entrega-form').style.display = 'none';
+      document.getElementById('entrega-criada').style.display = 'block';
+      document.getElementById('tracking-code').textContent = delivery.tracking_code;
+      document.getElementById('entrega-postal-code').textContent = (delivery.addresses && delivery.addresses.postal_code) || (delivery.addresses && delivery.addresses.plus_code) || 'sem código';
+      document.getElementById('entrega-estado').textContent = 'Estado: Criada';
+      document.getElementById('delivery-pin').textContent = delivery.confirmation_pin;
+
+      fetch(SUPABASE_URL + '/functions/v1/pricing?action=quote', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY },
+        body: JSON.stringify({ zone_code: zoneCode, organization_id: null })
+      }).then(function(r) { return r.json(); }).then(function(quote) {
+        document.getElementById('entrega-preco-linha').textContent =
+          'Grátis durante o piloto (fora do piloto: Frete ' + quote.breakdown.frete + ' + Roteamento ' + quote.breakdown.roteamento + ' + Prova ' + quote.breakdown.prova + ' = ' + quote.amount_total + ' Kz, zona ' + zoneCode + ')';
+      }).catch(function() { document.getElementById('entrega-preco-linha').textContent = 'Grátis durante o piloto'; });
+
+      var addr = delivery.addresses || {};
+      var mapsLink = (addr.latitude && addr.longitude) ? ('https://www.google.com/maps?q=' + addr.latitude + ',' + addr.longitude) : '';
+      var shareText = 'Entrega para ' + nome + ' · Código Postal Digital: ' + (addr.postal_code || '-') +
+        ' · PIN de confirmação (dá só a quem vai receber): ' + delivery.confirmation_pin +
+        ' · Código de rastreio: ' + delivery.tracking_code +
+        (mapsLink ? (' · Localização: ' + mapsLink) : '');
+
+      var qrContainer = document.getElementById('entrega-qr');
+      qrContainer.innerHTML = '';
+      new QRCode(qrContainer, {
+        text: mapsLink || delivery.tracking_code,
+        width: 140, height: 140,
+        colorDark: '#101826', colorLight: '#ffffff'
+      });
+
+    document.getElementById('btn-partilhar-entrega').addEventListener('click', function() {
+      if (navigator.share) {
+        navigator.share({ title: 'Angola Localiza — Entrega', text: shareText }).catch(function() {});
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(shareText);
+        document.getElementById('entrega-share-msg').textContent = 'Copiado! Cola onde quiseres partilhar (ex.: WhatsApp).';
+      }
+    });
+    document.getElementById('btn-copiar-entrega').addEventListener('click', function() {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(delivery.tracking_code);
+        document.getElementById('entrega-share-msg').textContent = 'Código copiado!';
+      }
+    });
+  }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
+  } // fim de proceed()
+
+  if (!navigator.geolocation) { proceed({}); return; }
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    var lat = pos.coords.latitude, lng = pos.coords.longitude;
+    fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng + '&format=json&addressdetails=1')
+      .then(function(r) { return r.json(); }).then(function(geo) {
+        var a = geo.address || {};
+        var provinceName = a.state || a.region || a.county || null;
+        var municipalityName = a.city || a.town || a.municipality || null;
+        var lookups = [
+          provinceName ? fetch(SUPABASE_URL + '/rest/v1/provinces?name=ilike.' + encodeURIComponent(provinceName) + '&select=id', { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token } }).then(function(r) { return r.json(); }) : Promise.resolve([]),
+          municipalityName ? fetch(SUPABASE_URL + '/rest/v1/municipalities?name=ilike.*' + encodeURIComponent(municipalityName) + '*&select=id,province_id', { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token } }).then(function(r) { return r.json(); }) : Promise.resolve([]),
+        ];
+        Promise.all(lookups).then(function(results) {
+          var provinceRows = results[0], muniRows = results[1];
+          proceed({
+            lat: lat, lng: lng,
+            province_id: (muniRows[0] && muniRows[0].province_id) || (provinceRows[0] && provinceRows[0].id) || null,
+            municipality_id: (muniRows[0] && muniRows[0].id) || null,
+          });
+        });
+      }).catch(function() { proceed({ lat: lat, lng: lng }); });
+  }, function() { proceed({}); }, { enableHighAccuracy: true, timeout: 8000 });
+});
+
+// ---- Admin ----
+function checkAdmin() {
+  fetch(SUPABASE_URL + '/functions/v1/admin?action=statistics', {
+    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+  }).then(function(r) {
+    isAdmin = r.status === 200;
+    document.getElementById('tab-btn-admin').style.display = isAdmin ? 'flex' : 'none';
+  }).catch(function() { isAdmin = false; });
+}
+
+function loadAdmin() {
+  if (!session || !isAdmin) return;
+
+  fetch(SUPABASE_URL + '/functions/v1/admin?action=statistics', {
+    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+  }).then(function(r) { return r.json(); }).then(function(stats) {
+    document.getElementById('stat-addresses').textContent = (stats && stats.total_addresses) || '-';
+    document.getElementById('stat-deliveries').textContent = (stats && stats.total_deliveries) || '-';
+    document.getElementById('stat-pending').textContent = (stats && stats.addresses_by_status && stats.addresses_by_status.PROPOSED) || 0;
+    document.getElementById('stat-field').textContent = (stats && stats.field_records_pending) || '-';
+  });
+
+  fetch(SUPABASE_URL + '/rest/v1/addresses?status=eq.PROPOSED&select=id,postal_code,plus_code,latitude,longitude,reference,created_at&order=created_at.desc&limit=20', {
+    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+  }).then(function(r) { return r.json(); }).then(function(rows) {
+    var list = document.getElementById('pending-list');
+    var empty = document.getElementById('pending-empty');
+    list.innerHTML = '';
+    if (!rows || rows.length === 0) { empty.style.display = 'block'; return; }
+    empty.style.display = 'none';
+    rows.forEach(function(addr) {
+      var div = document.createElement('div');
+      div.className = 'list-item';
+      div.innerHTML =
+        '<div class="value-md" style="color:var(--accent);font-weight:600;">' + (addr.postal_code || addr.plus_code || 'sem código') + '</div>' +
+        '<div style="font-size:11.5px;color:var(--text-dim);margin:3px 0 10px;">' + addr.latitude.toFixed(4) + ', ' + addr.longitude.toFixed(4) + '</div>' +
+        '<div class="btn-row">' +
+          '<button data-id="' + addr.id + '" data-action="approve_address" class="admin-btn btn btn-success-solid btn-sm">Aprovar</button>' +
+          '<button data-id="' + addr.id + '" data-action="reject_address" class="admin-btn btn btn-danger-outline btn-sm">Rejeitar</button>' +
+        '</div>';
+      list.appendChild(div);
+    });
+    document.querySelectorAll('.admin-btn').forEach(function(b) {
+      b.addEventListener('click', function() {
+        fetch(SUPABASE_URL + '/functions/v1/admin?action=' + b.dataset.action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+          body: JSON.stringify({ address_id: b.dataset.id })
+        }).then(function() { loadAdmin(); });
+      });
+    });
+  });
+
+  loadUnassignedDeliveries();
+  loadAuditLog();
+  setupInviteForm();
+  loadPricingAdmin();
+}
+
+function loadPricingAdmin() {
+  fetch(SUPABASE_URL + '/rest/v1/pricing_zones?select=*&order=zone_code.asc', { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token } })
+    .then(function(r) { return r.json(); }).then(function(zones) {
+      var list = document.getElementById('pricing-zones-list');
+      list.innerHTML = (zones || []).map(function(z) {
+        return '<div class="list-item">' +
+          '<div class="value-plain" style="font-weight:600;">Zona ' + z.zone_code + ' — ' + z.name + '</div>' +
+          '<div class="btn-row" style="margin-top:6px;gap:6px;flex-wrap:wrap;">' +
+            '<input class="input pz-frete" data-zone="' + z.zone_code + '" style="width:90px;" type="number" value="' + z.base_fee + '" placeholder="Frete" />' +
+            '<input class="input pz-roteamento" data-zone="' + z.zone_code + '" style="width:90px;" type="number" value="' + z.routing_fee + '" placeholder="Roteamento" />' +
+            '<input class="input pz-prova" data-zone="' + z.zone_code + '" style="width:90px;" type="number" value="' + z.proof_fee + '" placeholder="Prova" />' +
+            '<button data-zone="' + z.zone_code + '" class="btn btn-secondary btn-sm pz-guardar">Guardar</button>' +
+          '</div></div>';
+      }).join('');
+      document.querySelectorAll('.pz-guardar').forEach(function(b) {
+        b.addEventListener('click', function() {
+          var z = b.dataset.zone;
+          var frete = parseFloat(document.querySelector('.pz-frete[data-zone="' + z + '"]').value);
+          var roteamento = parseFloat(document.querySelector('.pz-roteamento[data-zone="' + z + '"]').value);
+          var prova = parseFloat(document.querySelector('.pz-prova[data-zone="' + z + '"]').value);
+          fetch(SUPABASE_URL + '/functions/v1/pricing?action=admin_update_zone', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+            body: JSON.stringify({ zone_code: z, base_fee: frete, routing_fee: roteamento, proof_fee: prova })
+          }).then(function(r) { return r.json(); }).then(function(data) {
+            if (data.error) alert(data.error); else loadPricingAdmin();
+          });
+        });
+      });
+    });
+
+  fetch(SUPABASE_URL + '/rest/v1/usage_events?select=amount_total,amount_driver,amount_platform,is_free_pilot,event_type', {
+    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+  }).then(function(r) { return r.json(); }).then(function(rows) {
+    rows = rows || [];
+    var real = rows.filter(function(r) { return !r.is_free_pilot; });
+    var totalReal = real.reduce(function(s, r) { return s + Number(r.amount_total); }, 0);
+    var totalSombra = rows.reduce(function(s, r) { return s + Number(r.amount_total); }, 0);
+    document.getElementById('pricing-ledger-summary').textContent =
+      rows.length + ' eventos registados · ' + real.length + ' faturáveis a sério (' + totalReal.toFixed(0) + ' Kz) · piloto grátis simulou ' + (totalSombra - totalReal).toFixed(0) + ' Kz em valor de sombra';
+  }).catch(function() {});
+}
+
+function loadUnassignedDeliveries() {
+  Promise.all([
+    fetch(SUPABASE_URL + '/functions/v1/admin?action=list_unassigned_deliveries', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }, body: '{}'
+    }).then(function(r) { return r.json(); }),
+    fetch(SUPABASE_URL + '/functions/v1/admin?action=list_estafetas', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }, body: '{}'
+    }).then(function(r) { return r.json(); })
+  ]).then(function(results) {
+    var deliveries = results[0].deliveries || [];
+    var estafetas = results[1].estafetas || [];
+    var list = document.getElementById('unassigned-list');
+    var empty = document.getElementById('unassigned-empty');
+    list.innerHTML = '';
+    if (deliveries.length === 0) { empty.style.display = 'block'; return; }
+    empty.style.display = 'none';
+
+    if (estafetas.length === 0) {
+      list.innerHTML = '<p class="msg msg-muted">Sem estafetas registados ainda — cria uma conta e atribui o cargo "estafeta".</p>';
+      return;
+    }
+
+    deliveries.forEach(function(d) {
+      var div = document.createElement('div');
+      div.className = 'list-item';
+      var options = estafetas.map(function(e) { return '<option value="' + e.id + '">' + e.email + '</option>'; }).join('');
+      div.innerHTML =
+        '<div class="value-md" style="color:var(--accent);font-weight:600;">' + d.tracking_code + '</div>' +
+        '<div style="font-size:11.5px;color:var(--text-dim);margin:2px 0 8px;">' + d.recipient_name + '</div>' +
+        '<select class="input assign-select" style="height:40px;margin-bottom:8px;">' + options + '</select>' +
+        '<button data-delivery="' + d.id + '" class="assign-btn btn btn-success-solid btn-sm">Atribuir</button>';
+      list.appendChild(div);
+    });
+    document.querySelectorAll('.assign-btn').forEach(function(b) {
+      b.addEventListener('click', function() {
+        var select = b.parentElement.querySelector('.assign-select');
+        fetch(SUPABASE_URL + '/functions/v1/deliveries?action=assign_driver', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+          body: JSON.stringify({ delivery_id: b.dataset.delivery, driver_id: select.value })
+        }).then(function() { loadUnassignedDeliveries(); loadAdmin(); });
+      });
+    });
+  }).catch(function() {});
+}
+
+function loadAuditLog() {
+  fetch(SUPABASE_URL + '/functions/v1/admin?action=audit', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }, body: '{}'
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    var logs = data.logs || [];
+    var list = document.getElementById('audit-list');
+    var empty = document.getElementById('audit-empty');
+    list.innerHTML = '';
+    if (logs.length === 0) { empty.style.display = 'block'; return; }
+    empty.style.display = 'none';
+    logs.slice(0, 15).forEach(function(log) {
+      var div = document.createElement('div');
+      div.className = 'list-item';
+      var when = new Date(log.created_at).toLocaleString('pt-PT');
+      div.innerHTML = '<div class="value-plain">' + log.action + '</div><div style="font-size:11px;color:var(--text-dim);margin-top:2px;">' + when + '</div>';
+      list.appendChild(div);
+    });
+  }).catch(function() {});
+}
+
+// ---- Importar/Exportar ----
+document.getElementById('btn-invite').addEventListener('click', function() {
+  sendInvite(false);
+});
+
+var ROLE_LABELS = {
+  super_admin: 'Super admin', admin_nacional: 'Admin nacional', admin_provincial: 'Admin provincial',
+  admin_municipal: 'Admin municipal', supervisor: 'Supervisor', auditor: 'Auditor',
+  operador_postal: 'Operador postal', tecnico_campo: 'Técnico de campo', estafeta: 'Estafeta',
+};
+var ALLOWED_INVITES_CLIENT = {
+  super_admin: ['super_admin','admin_nacional','admin_provincial','admin_municipal','auditor','operador_postal','supervisor','tecnico_campo','estafeta'],
+  admin_nacional: ['admin_provincial','admin_municipal','auditor','operador_postal','supervisor','tecnico_campo','estafeta'],
+  admin_provincial: ['admin_municipal','auditor','operador_postal','supervisor','tecnico_campo','estafeta'],
+  admin_municipal: ['auditor','operador_postal','supervisor','tecnico_campo','estafeta'],
+  supervisor: ['tecnico_campo','estafeta'],
+};
+
+function setupInviteForm() {
+  var myBest = null, myRank = 99;
+  var RANK = { super_admin:0, admin_nacional:1, admin_provincial:2, admin_municipal:3, supervisor:4, auditor:5, operador_postal:5, tecnico_campo:5, estafeta:5 };
+  myRoles.forEach(function(r) { if ((RANK[r] ?? 9) < myRank) { myRank = RANK[r] ?? 9; myBest = r; } });
+
+  var roleSelect = document.getElementById('invite-role');
+  var options = ALLOWED_INVITES_CLIENT[myBest] || [];
+  roleSelect.innerHTML = options.map(function(r) { return '<option value="' + r + '">' + ROLE_LABELS[r] + '</option>'; }).join('');
+
+  var SECTOR_TYPE_LABELS = {
+    governo: 'Governo/Institucional', municipio: 'Município', operador_postal: 'Operador Postal',
+    banco: 'Banco', seguros: 'Seguros', logistica: 'Logística', telecom: 'Telecom',
+    fmcg: 'FMCG', ong: 'ONG', empresa: 'Empresa', outro: 'Outro'
+  };
+  var SECTOR_TYPE_ORDER = ['governo', 'municipio', 'operador_postal', 'banco', 'seguros', 'logistica', 'telecom', 'fmcg', 'ong', 'empresa', 'outro'];
+
+  if (myBest === 'super_admin') {
+    document.getElementById('invite-sector-field').style.display = 'block';
+    document.getElementById('invite-sector-readonly').style.display = 'none';
+    fetch(SUPABASE_URL + '/rest/v1/organizations?select=id,name,type&order=name.asc', { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token } })
+      .then(function(r) { return r.json(); }).then(function(rows) {
+        var byType = {};
+        (rows || []).forEach(function(o) { (byType[o.type] = byType[o.type] || []).push(o); });
+        var html = '';
+        SECTOR_TYPE_ORDER.forEach(function(t) {
+          if (!byType[t] || byType[t].length === 0) return;
+          html += '<optgroup label="' + (SECTOR_TYPE_LABELS[t] || t) + '">';
+          html += byType[t].map(function(o) { return '<option value="' + o.id + '">' + o.name + '</option>'; }).join('');
+          html += '</optgroup>';
+        });
+        document.getElementById('invite-sector').innerHTML = html;
+      });
+  } else {
+    document.getElementById('invite-sector-field').style.display = 'none';
+    var readonlyMsg = document.getElementById('invite-sector-readonly');
+    readonlyMsg.style.display = 'block';
+    fetch(SUPABASE_URL + '/rest/v1/organization_members?select=organizations(name)&limit=1', { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token } })
+      .then(function(r) { return r.json(); }).then(function(rows) {
+        var orgName = rows && rows[0] && rows[0].organizations ? rows[0].organizations.name : '?';
+        readonlyMsg.textContent = 'Setor: ' + orgName + ' (só o super admin pode convidar para outro setor)';
+      });
+  }
+
+  fetch(SUPABASE_URL + '/rest/v1/provinces?select=id,name&order=name.asc', { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token } })
+    .then(function(r) { return r.json(); }).then(function(rows) {
+      var sel = document.getElementById('invite-province');
+      sel.innerHTML = rows.map(function(p) { return '<option value="' + p.id + '">' + p.name + '</option>'; }).join('');
+    });
+
+  roleSelect.addEventListener('change', toggleInviteScopeFields);
+  toggleInviteScopeFields();
+}
+
+function toggleInviteScopeFields() {
+  var role = document.getElementById('invite-role').value;
+  document.getElementById('invite-province-field').style.display = role === 'admin_provincial' ? 'block' : 'none';
+  document.getElementById('invite-municipality-field').style.display = role === 'admin_municipal' ? 'block' : 'none';
+  if (role === 'admin_municipal') loadMunicipalitiesForInvite();
+}
+
+function loadMunicipalitiesForInvite() {
+  var provinceSel = document.getElementById('invite-province');
+  var muniSel = document.getElementById('invite-municipality');
+  // Reutiliza a lista de províncias já carregada para preencher municípios de todas (simplificado: carrega todos)
+  fetch(SUPABASE_URL + '/rest/v1/municipalities?select=id,name,provinces(name)&order=name.asc', { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token } })
+    .then(function(r) { return r.json(); }).then(function(rows) {
+      muniSel.innerHTML = rows.map(function(m) { return '<option value="' + m.id + '">' + m.name + (m.provinces ? ' (' + m.provinces.name + ')' : '') + '</option>'; }).join('');
+    });
+}
+
+function sendInvite(confirmFlag) {
+  var email = document.getElementById('invite-email').value.trim();
+  var role = document.getElementById('invite-role').value;
+  var sectorField = document.getElementById('invite-sector-field');
+  var organizationId = sectorField.style.display !== 'none' ? document.getElementById('invite-sector').value : null;
+  var provinceId = document.getElementById('invite-province').value || null;
+  var municipalityId = document.getElementById('invite-municipality').value || null;
+  var msg = document.getElementById('invite-msg');
+  if (!email) { msg.className = 'msg msg-error'; msg.textContent = 'Introduz o email.'; return; }
+  msg.className = 'msg msg-muted'; msg.textContent = 'A processar...';
+
+  fetch(SUPABASE_URL + '/functions/v1/invite-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+    body: JSON.stringify({ email: email, role: role, organization_id: organizationId, province_id: provinceId, municipality_id: municipalityId, confirm: confirmFlag })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.needs_confirmation) {
+      if (window.confirm(data.message)) { sendInvite(true); } else { msg.className = 'msg msg-muted'; msg.textContent = 'Cancelado.'; }
+      return;
+    }
+    if (data.error) { msg.className = 'msg msg-error'; msg.textContent = data.error; return; }
+    msg.className = 'msg msg-success';
+    msg.textContent = data.promoted ? (email + ' promovido(a) a ' + role + '.') :
+      data.assigned_to_existing_account ? (email + ' já tinha conta — cargo ' + role + ' atribuído.') :
+      (email + ' convidado(a) como ' + role + '. Vai receber um email para definir a palavra-passe.');
+    document.getElementById('invite-email').value = '';
+  }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
+}
+
+document.getElementById('btn-import').addEventListener('click', function() {
+  var fileInput = document.getElementById('import-file');
+  var msg = document.getElementById('import-msg');
+  if (!fileInput.files[0]) { msg.className = 'msg msg-error'; msg.textContent = 'Escolhe um ficheiro CSV primeiro.'; return; }
+  msg.className = 'msg msg-muted'; msg.textContent = 'A processar...';
+
+  var reader = new FileReader();
+  reader.onload = function() {
+    fetch(SUPABASE_URL + '/functions/v1/imports?action=process_csv', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+      body: JSON.stringify({ csv_text: reader.result })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.error) { msg.className = 'msg msg-error'; msg.textContent = data.error; return; }
+      msg.className = 'msg msg-success';
+      msg.textContent = 'Concluído: ' + data.valid + ' válidas, ' + data.invalid + ' inválidas, ' + data.duplicates + ' duplicadas (de ' + data.total + ').';
+    }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
+  };
+  reader.readAsText(fileInput.files[0]);
+});
+
+function exportAs(format) {
+  var msg = document.getElementById('export-msg');
+  msg.className = 'msg msg-muted'; msg.textContent = 'A gerar...';
+  fetch(SUPABASE_URL + '/functions/v1/exports', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+    body: JSON.stringify({ format: format })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.error) { msg.className = 'msg msg-error'; msg.textContent = data.error; return; }
+    var blob = new Blob([data.content], { type: format === 'csv' ? 'text/csv' : 'application/geo+json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'angola-localiza-moradas.' + (format === 'csv' ? 'csv' : 'geojson');
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    msg.className = 'msg msg-success'; msg.textContent = data.row_count + ' moradas exportadas.';
+  }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
+}
+document.getElementById('btn-export-csv').addEventListener('click', function() { exportAs('csv'); });
+document.getElementById('btn-export-geojson').addEventListener('click', function() { exportAs('geojson'); });
+
+// ---- Minhas Entregas (Estafeta) ----
+var NEXT_DELIVERY_STATUS = { ASSIGNED: 'PICKED_UP', PICKED_UP: 'IN_TRANSIT', IN_TRANSIT: 'OUT_FOR_DELIVERY', OUT_FOR_DELIVERY: 'DELIVERED' };
+var STATUS_LABEL = { ASSIGNED: 'Atribuída', PICKED_UP: 'Recolhida', IN_TRANSIT: 'Em trânsito', OUT_FOR_DELIVERY: 'Saiu para entrega', DELIVERED: 'Entregue', FAILED: 'Falhada', CANCELLED: 'Cancelada', CREATED: 'Criada' };
+var NEXT_ACTION_LABEL = { PICKED_UP: 'Iniciar recolha', IN_TRANSIT: 'Iniciar trânsito', OUT_FOR_DELIVERY: 'A caminho', DELIVERED: 'Cheguei — iniciar POD' };
+var FAILURE_REASON_LABEL = { morada_nao_encontrada: 'Morada não encontrada', destinatario_ausente: 'Destinatário ausente', codigo_incorreto: 'Código incorreto', recusa: 'Recusa', outro: 'Outro' };
+var minhasEntregasCache = [];
+var minhasEntregasFilter = 'todas';
+var podDeliveryId = null, podPhotoUrl = null;
+var falhaDeliveryId = null;
+
+document.querySelectorAll('.entregas-filter-btn').forEach(function(b) {
+  b.addEventListener('click', function() {
+    document.querySelectorAll('.entregas-filter-btn').forEach(function(x) { x.classList.remove('active'); });
+    b.classList.add('active');
+    minhasEntregasFilter = b.dataset.filter;
+    renderMinhasEntregas();
+  });
+});
+document.getElementById('minhas-entregas-search').addEventListener('input', renderMinhasEntregas);
+
+function loadMinhasEntregas() {
+  if (!session) return;
+  var myId = parseJwt(session.access_token).sub;
+  var list = document.getElementById('minhas-entregas-list');
+  list.innerHTML = '<p class="msg msg-muted">A carregar...</p>';
+
+  fetch(SUPABASE_URL + '/rest/v1/deliveries?assigned_driver=eq.' + myId + '&select=id,tracking_code,status,recipient_name,recipient_phone,instructions,updated_at,addresses(reference,plus_code,postal_code),delivery_proofs(id)&order=updated_at.desc', {
+    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+  }).then(function(r) { return r.json(); }).then(function(rows) {
+    minhasEntregasCache = rows || [];
+    renderMinhasEntregas();
+    renderEntregasStats();
+  }).catch(function() { list.innerHTML = '<p class="msg msg-error">Erro ao carregar.</p>'; });
+  entregasUpdateOfflineMini();
+}
+
+function entregasUpdateOfflineMini() {
+  var el = document.getElementById('entregas-offline-mini');
+  var pending = getPendingOps().length;
+  el.onclick = null;
+  if (!navigator.onLine || pending > 0) {
+    el.className = 'msg msg-error';
+    el.innerHTML = (!navigator.onLine ? 'Offline' : 'Ligado') + ' · ' + pending + ' pendentes' + (pending > 0 ? ' · <u>Sincronizar agora</u>' : '');
+    if (pending > 0) el.onclick = function() { syncPendingOps(); setTimeout(entregasUpdateOfflineMini, 800); };
+  } else { el.className = 'msg msg-success'; el.textContent = 'Ligado.'; }
+}
+
+function renderEntregasStats() {
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var todays = minhasEntregasCache.filter(function(d) {
+    return ['DELIVERED', 'FAILED'].indexOf(d.status) > -1 && new Date(d.updated_at) >= today;
+  });
+  var delivered = todays.filter(function(d) { return d.status === 'DELIVERED'; });
+  var withProof = todays.filter(function(d) { return d.delivery_proofs && d.delivery_proofs.length > 0; });
+  var rate = todays.length > 0 ? Math.round((delivered.length / todays.length) * 100) : 0;
+  document.getElementById('entregas-stats').textContent =
+    'Hoje: ' + todays.length + ' entregas · ' + withProof.length + ' com prova · ' + rate + '% sucesso';
+}
+
+function renderMinhasEntregas() {
+  var list = document.getElementById('minhas-entregas-list');
+  var empty = document.getElementById('minhas-entregas-empty');
+  var query = document.getElementById('minhas-entregas-search').value.trim().toLowerCase();
+
+  var rows = minhasEntregasCache.filter(function(d) {
+    if (minhasEntregasFilter === 'em_curso' && ['DELIVERED', 'FAILED', 'CANCELLED'].indexOf(d.status) > -1) return false;
+    if (minhasEntregasFilter === 'falhadas' && d.status !== 'FAILED') return false;
+    if (minhasEntregasFilter === 'concluidas' && d.status !== 'DELIVERED' && d.status !== 'CANCELLED') return false;
+    if (query && d.tracking_code.toLowerCase().indexOf(query) === -1 && d.recipient_name.toLowerCase().indexOf(query) === -1) return false;
+    return true;
+  });
+
+  list.innerHTML = '';
+  if (rows.length === 0) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  rows.forEach(function(d) {
+    var addr = d.addresses || {};
+    var div = document.createElement('div');
+    div.className = 'list-item';
+    var next = NEXT_DELIVERY_STATUS[d.status];
+    var actions = '';
+    if (next) {
+      actions += '<button data-id="' + d.id + '" data-status="' + next + '" class="entrega-status-btn btn btn-success-solid btn-sm">' + NEXT_ACTION_LABEL[next] + '</button>';
+    }
+    if (d.status === 'OUT_FOR_DELIVERY') {
+      actions += '<button data-id="' + d.id + '" data-status="FAILED" class="entrega-falha-btn btn btn-danger-outline btn-sm">Falhou</button>';
+    }
+    if (d.status === 'FAILED') {
+      actions += '<button data-id="' + d.id + '" data-status="ASSIGNED" class="entrega-status-btn btn btn-secondary btn-sm">🔁 Reagendar tentativa</button>';
+    }
+    var whatsappHref = '';
+    if (d.recipient_phone) {
+      var phoneDigits = d.recipient_phone.replace(/[^0-9]/g, '');
+      var waText = encodeURIComponent('Olá ' + d.recipient_name + ', sou o estafeta da tua entrega ' + d.tracking_code + '. Código Postal: ' + (addr.postal_code || '-'));
+      whatsappHref = 'https://wa.me/' + phoneDigits + '?text=' + waText;
+    }
+    div.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">' +
+        '<div>' +
+          '<div class="value-md" style="color:var(--accent);font-weight:700;font-size:15px;">' + (addr.postal_code || 'sem código') + '</div>' +
+          (addr.plus_code ? '<div style="font-size:10.5px;color:var(--text-faint);">' + addr.plus_code + '</div>' : '') +
+          '<div style="font-size:10px;color:var(--text-faint);margin-top:2px;">#' + d.tracking_code + '</div>' +
+          '<div style="font-size:12.5px;font-weight:600;margin-top:4px;">' + d.recipient_name + '</div>' +
+          (addr.reference ? '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">📍 ' + addr.reference + '</div>' : '') +
+          (d.instructions ? '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">📝 ' + d.instructions + '</div>' : '') +
+          '<div style="font-size:11.5px;color:var(--text-dim);margin-top:4px;">' + (STATUS_LABEL[d.status] || d.status) + '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px;">' +
+          (whatsappHref ? '<a href="' + whatsappHref + '" target="_blank" class="icon-btn" aria-label="WhatsApp" style="text-decoration:none;">💬</a>' : '') +
+          (d.recipient_phone ? '<a href="tel:' + d.recipient_phone + '" class="icon-btn" aria-label="Ligar" style="text-decoration:none;">📞</a>' : '') +
+        '</div>' +
+      '</div>' +
+      (actions ? '<div class="btn-row" style="margin-top:10px;">' + actions + '</div>' : '');
+    list.appendChild(div);
+  });
+
+  document.querySelectorAll('.entrega-status-btn').forEach(function(b) {
+    b.addEventListener('click', function() {
+      var newStatus = b.dataset.status;
+      if (newStatus === 'DELIVERED') { openPodBox(b.dataset.id); return; }
+      fetch(SUPABASE_URL + '/functions/v1/deliveries?action=update_status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+        body: JSON.stringify({ delivery_id: b.dataset.id, new_status: newStatus })
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.error) { alert(data.error); return; }
+        loadMinhasEntregas();
+      });
+    });
+  });
+  document.querySelectorAll('.entrega-falha-btn').forEach(function(b) {
+    b.addEventListener('click', function() { openFalhaBox(b.dataset.id); });
+  });
+}
+
+// ---- POD (foto + assinatura) ----
+var podSigCanvas, podSigCtx, podSigDrawing = false, podSigHasContent = false;
+function podInitSignature() {
+  podSigCanvas = document.getElementById('pod-signature-canvas');
+  podSigCanvas.width = podSigCanvas.offsetWidth; podSigCanvas.height = 140;
+  podSigCtx = podSigCanvas.getContext('2d');
+  podSigCtx.strokeStyle = '#101826'; podSigCtx.lineWidth = 2; podSigCtx.lineCap = 'round';
+  podSigHasContent = false;
+
+  function pos(e) {
+    var r = podSigCanvas.getBoundingClientRect();
+    var p = e.touches ? e.touches[0] : e;
+    return { x: p.clientX - r.left, y: p.clientY - r.top };
+  }
+  function start(e) { podSigDrawing = true; var p = pos(e); podSigCtx.beginPath(); podSigCtx.moveTo(p.x, p.y); }
+  function move(e) { if (!podSigDrawing) return; e.preventDefault(); var p = pos(e); podSigCtx.lineTo(p.x, p.y); podSigCtx.stroke(); podSigHasContent = true; }
+  function end() { podSigDrawing = false; }
+  podSigCanvas.onmousedown = start; podSigCanvas.onmousemove = move; podSigCanvas.onmouseup = end;
+  podSigCanvas.ontouchstart = start; podSigCanvas.ontouchmove = move; podSigCanvas.ontouchend = end;
+}
+document.getElementById('btn-pod-limpar-assinatura').addEventListener('click', function() {
+  podSigCtx.clearRect(0, 0, podSigCanvas.width, podSigCanvas.height);
+  podSigCtx.fillStyle = '#ffffff'; podSigCtx.fillRect(0, 0, podSigCanvas.width, podSigCanvas.height);
+  podSigHasContent = false;
+});
+
+function openPodBox(deliveryId) {
+  podDeliveryId = deliveryId; podPhotoUrl = null;
+  document.getElementById('pod-photo-preview').style.display = 'none';
+  document.getElementById('pod-photo-status').textContent = '';
+  document.getElementById('pod-photo-input').value = '';
+  document.getElementById('pod-observacao').value = '';
+  document.getElementById('pod-pin').value = '';
+  document.getElementById('pod-volumoso').checked = false;
+  document.getElementById('pod-espera-longa').checked = false;
+  document.getElementById('pod-msg').textContent = '';
+  document.getElementById('pod-box').style.display = 'block';
+  document.getElementById('pod-box').scrollIntoView({ behavior: 'smooth' });
+  podInitSignature();
+}
+document.getElementById('btn-pod-cancelar').addEventListener('click', function() { document.getElementById('pod-box').style.display = 'none'; });
+
+document.getElementById('pod-photo-input').addEventListener('change', function(e) {
+  var file = e.target.files[0];
+  var statusEl = document.getElementById('pod-photo-status');
+  var preview = document.getElementById('pod-photo-preview');
+  if (!file) return;
+  statusEl.className = 'msg msg-muted'; statusEl.textContent = 'A processar...';
+  var img = new Image(); var reader = new FileReader();
+  reader.onload = function(ev) {
+    img.onload = function() {
+      var maxDim = 1280;
+      var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      var w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+      var canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
+      canvas.toBlob(function(blob) {
+        preview.src = URL.createObjectURL(blob); preview.style.display = 'block';
+        statusEl.textContent = 'A enviar (' + Math.round(blob.size / 1024) + ' KB)...';
+        var fileName = 'pod-' + Date.now() + '.jpg';
+        fetch(SUPABASE_URL + '/storage/v1/object/field-photos/' + fileName, {
+          method: 'POST', headers: { 'Authorization': 'Bearer ' + session.access_token, 'apikey': ANON_KEY, 'Content-Type': 'image/jpeg' }, body: blob
+        }).then(function(r) {
+          if (r.ok) { podPhotoUrl = SUPABASE_URL + '/storage/v1/object/public/field-photos/' + fileName; statusEl.className = 'msg msg-success'; statusEl.textContent = 'Foto pronta.'; }
+          else { statusEl.className = 'msg msg-error'; statusEl.textContent = 'Erro ao enviar.'; }
+        });
+      }, 'image/jpeg', 0.65);
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('btn-pod-confirmar').addEventListener('click', function() {
+  var msg = document.getElementById('pod-msg');
+  var pin = document.getElementById('pod-pin').value.trim();
+  if (!pin) { msg.className = 'msg msg-error'; msg.textContent = 'Introduz o PIN.'; return; }
+  msg.className = 'msg msg-muted'; msg.textContent = 'A confirmar...';
+
+  function finish(signatureUrl) {
+    function send(proof) {
+      fetch(SUPABASE_URL + '/functions/v1/deliveries?action=update_status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+        body: JSON.stringify({ delivery_id: podDeliveryId, new_status: 'DELIVERED', pin: pin, proof: proof, is_volumoso: document.getElementById('pod-volumoso').checked, is_espera_longa: document.getElementById('pod-espera-longa').checked })
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.error) { msg.className = 'msg msg-error'; msg.textContent = data.error; return; }
+        document.getElementById('pod-box').style.display = 'none';
+        loadMinhasEntregas();
+      }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
+    }
+    var proof = { observation: document.getElementById('pod-observacao').value.trim(), photo_url: podPhotoUrl, signature_url: signatureUrl };
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(function(pos) { proof.latitude = pos.coords.latitude; proof.longitude = pos.coords.longitude; send(proof); }, function() { send(proof); }, { timeout: 8000 });
+    } else { send(proof); }
+  }
+
+  if (podSigHasContent) {
+    podSigCanvas.toBlob(function(blob) {
+      var fileName = 'sig-' + Date.now() + '.png';
+      fetch(SUPABASE_URL + '/storage/v1/object/field-photos/' + fileName, {
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + session.access_token, 'apikey': ANON_KEY, 'Content-Type': 'image/png' }, body: blob
+      }).then(function(r) { finish(r.ok ? SUPABASE_URL + '/storage/v1/object/public/field-photos/' + fileName : null); });
+    }, 'image/png');
+  } else { finish(null); }
+});
+
+// ---- Falha estruturada ----
+function openFalhaBox(deliveryId) {
+  falhaDeliveryId = deliveryId;
+  document.getElementById('falha-nota').value = '';
+  document.getElementById('falha-msg').textContent = '';
+  document.getElementById('falha-box').style.display = 'block';
+  document.getElementById('falha-box').scrollIntoView({ behavior: 'smooth' });
+}
+document.getElementById('btn-falha-cancelar').addEventListener('click', function() { document.getElementById('falha-box').style.display = 'none'; });
+document.getElementById('btn-falha-confirmar').addEventListener('click', function() {
+  var msg = document.getElementById('falha-msg');
+  var reason = document.getElementById('falha-motivo').value;
+  var nota = document.getElementById('falha-nota').value.trim();
+  msg.className = 'msg msg-muted'; msg.textContent = 'A confirmar...';
+
+  function send(proof) {
+    fetch(SUPABASE_URL + '/functions/v1/deliveries?action=update_status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+      body: JSON.stringify({ delivery_id: falhaDeliveryId, new_status: 'FAILED', reason: reason, proof: proof })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.error) { msg.className = 'msg msg-error'; msg.textContent = data.error; return; }
+      document.getElementById('falha-box').style.display = 'none';
+      loadMinhasEntregas();
+    }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
+  }
+  var proof = { observation: nota };
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(pos) { proof.latitude = pos.coords.latitude; proof.longitude = pos.coords.longitude; send(proof); }, function() { send(proof); }, { timeout: 8000 });
+  } else { send(proof); }
+});
+
+// ---- Campo (Técnico de Campo) ----
+var campoDeviceId = 'web-' + Math.random().toString(36).slice(2);
+var campoLocation = null; // { lat, lng, plusCode, accuracy }
+var campoPhotoFacadeUrl = null;
+var campoPhotoQrUrl = null;
+var campoDuplicate = null; // { found, distance_meters, postal_code, address_id }
+var campoDuplicateOverrideReason = null;
+var campoStreetNoName = false;
+
+function campoUpdateSubmitState() {
+  var btn = document.getElementById('btn-campo-enviar');
+  var accuracyOk = campoLocation && (campoLocation.accuracy <= 15 ||
+    (document.getElementById('campo-precisao-justificacao').value.trim().length >= 10));
+  var duplicateOk = !campoDuplicate || !campoDuplicate.found || !!campoDuplicateOverrideReason;
+  var ok = !!campoLocation && accuracyOk && duplicateOk &&
+    document.getElementById('campo-house').value.trim() &&
+    document.getElementById('campo-reference').value.trim() &&
+    document.getElementById('campo-neighborhood').value.trim() &&
+    campoPhotoFacadeUrl && campoPhotoQrUrl;
+  btn.disabled = !ok;
+}
+['campo-house', 'campo-reference', 'campo-neighborhood', 'campo-street', 'campo-precisao-justificacao'].forEach(function(id) {
+  document.getElementById(id).addEventListener('input', campoUpdateSubmitState);
+});
+
+document.getElementById('campo-street-sem-nome').addEventListener('change', function() {
+  campoStreetNoName = this.checked;
+  var streetInput = document.getElementById('campo-street');
+  if (this.checked) { streetInput.value = 'Rua sem denominação oficial (usar referência)'; streetInput.disabled = true; }
+  else { streetInput.value = ''; streetInput.disabled = false; }
+  campoUpdateSubmitState();
+});
+
+function campoLoadDailyCount() {
+  fetch(SUPABASE_URL + '/functions/v1/field-service?action=daily_count', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }, body: '{}'
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    document.getElementById('campo-daily-count').textContent = (data.count ?? 0) + '/40 hoje';
+  }).catch(function() {});
+}
+
+function campoUpdateOfflineMini() {
+  var el = document.getElementById('campo-offline-mini');
+  var pending = getPendingOps().length;
+  el.onclick = null;
+  if (!navigator.onLine || pending > 0) {
+    el.className = 'msg msg-error';
+    el.innerHTML = (!navigator.onLine ? 'Offline' : 'Ligado') + ' · ' + pending + ' pendentes' + (pending > 0 ? ' · <u>Sincronizar agora</u>' : '');
+    if (pending > 0) el.onclick = function() { syncPendingOps(); setTimeout(campoUpdateOfflineMini, 800); };
+  } else {
+    el.className = 'msg msg-success'; el.textContent = 'Ligado.';
+  }
+}
+
+function campoLoadBairros() {
+  fetch(SUPABASE_URL + '/rest/v1/neighborhoods?select=name&limit=200', { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token } })
+    .then(function(r) { return r.json(); }).then(function(rows) {
+      var list = document.getElementById('campo-bairros-lista');
+      list.innerHTML = (rows || []).map(function(n) { return '<option value="' + n.name + '">'; }).join('');
+    }).catch(function() {});
+}
+
+function campoCaptureGps() {
+  var valueEl = document.getElementById('campo-gps-value');
+  valueEl.className = 'msg msg-muted'; valueEl.textContent = 'A obter 3 leituras de GPS...';
+  document.getElementById('campo-gps-card').style.display = 'none';
+  document.getElementById('campo-duplicado-box').style.display = 'none';
+  campoDuplicate = null; campoDuplicateOverrideReason = null;
+
+  var readings = [];
+  function readOnce() {
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      readings.push(pos.coords);
+      valueEl.textContent = 'Leitura ' + readings.length + '/3...';
+      if (readings.length < 3) { setTimeout(readOnce, 400); return; }
+      finishCapture();
+    }, function(err) {
+      if (readings.length > 0) { finishCapture(); return; }
+      valueEl.className = 'msg msg-error'; valueEl.textContent = 'Erro ao obter GPS: ' + err.message;
+    }, { enableHighAccuracy: true, timeout: 10000 });
+  }
+
+  function finishCapture() {
+    var lat = readings.reduce(function(s, c) { return s + c.latitude; }, 0) / readings.length;
+    var lng = readings.reduce(function(s, c) { return s + c.longitude; }, 0) / readings.length;
+    var accuracy = Math.min.apply(null, readings.map(function(c) { return c.accuracy; }));
+    var plusCode = encodeOLC(lat, lng);
+    campoLocation = { lat: lat, lng: lng, plusCode: plusCode, accuracy: accuracy };
+
+    valueEl.className = 'msg msg-success'; valueEl.textContent = 'GPS capturado (média de ' + readings.length + ' leituras).';
+    document.getElementById('campo-gps-card').style.display = 'block';
+    document.getElementById('campo-coords').textContent = lat.toFixed(5) + ', ' + lng.toFixed(5);
+    document.getElementById('campo-pluscode-value').textContent = plusCode;
+
+    var precisaoEl = document.getElementById('campo-precisao');
+    var precisaoBaixaBox = document.getElementById('campo-precisao-baixa-box');
+    if (accuracy <= 5) { precisaoEl.innerHTML = '🟢 ±' + Math.round(accuracy) + ' m — Precisão excelente'; precisaoBaixaBox.style.display = 'none'; }
+    else if (accuracy <= 15) { precisaoEl.innerHTML = '🟡 ±' + Math.round(accuracy) + ' m — Precisão média'; precisaoBaixaBox.style.display = 'none'; }
+    else { precisaoEl.innerHTML = '🔴 ±' + Math.round(accuracy) + ' m — Precisão baixa'; precisaoBaixaBox.style.display = 'block'; }
+
+    document.getElementById('campo-chips').textContent = 'a identificar...';
+    document.getElementById('campo-codigo-previsto').textContent = 'a calcular...';
+
+    fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng + '&format=json&addressdetails=1')
+      .then(function(r) { return r.json(); }).then(function(geo) {
+        var a = geo.address || {};
+        var province = a.state || a.region || a.county || null;
+        var municipality = a.city || a.town || a.municipality || null;
+        campoLocation.provinceName = province;
+        document.getElementById('campo-chips').textContent =
+          (province ? 'Província do ' + province : 'província não identificada') +
+          (municipality ? ' · Município do ' + municipality : '');
+        return fetch(SUPABASE_URL + '/functions/v1/generate-postal-code', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY },
+          body: JSON.stringify({ latitude: lat, longitude: lng, province_name: province })
+        });
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        document.getElementById('campo-codigo-previsto').textContent = data.postal_code || 'erro';
+        campoLocation.postalCodePreview = data.postal_code;
+      }).catch(function() { document.getElementById('campo-chips').textContent = 'erro ao identificar'; });
+
+    fetch(SUPABASE_URL + '/functions/v1/field-service?action=check_duplicates', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+      body: JSON.stringify({ latitude: lat, longitude: lng })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      campoDuplicate = data;
+      if (data.found) {
+        document.getElementById('campo-duplicado-box').style.display = 'block';
+        document.getElementById('campo-duplicado-info').textContent =
+          'A ' + Math.round(data.distance_meters) + ' m: ' + (data.postal_code || '(sem código)');
+      }
+      campoUpdateSubmitState();
+    }).catch(function() { campoUpdateSubmitState(); });
+
+    campoUpdateSubmitState();
+  }
+  readOnce();
+}
+
+document.getElementById('btn-campo-gps').addEventListener('click', campoCaptureGps);
+document.getElementById('btn-campo-recapturar').addEventListener('click', campoCaptureGps);
+
+document.getElementById('btn-duplicado-vincular').addEventListener('click', function() {
+  var accuracyOk = campoLocation && (campoLocation.accuracy <= 15 ||
+    document.getElementById('campo-precisao-justificacao').value.trim().length >= 10);
+  var fieldsOk = document.getElementById('campo-house').value.trim() &&
+    document.getElementById('campo-reference').value.trim() &&
+    document.getElementById('campo-neighborhood').value.trim() &&
+    campoPhotoFacadeUrl && campoPhotoQrUrl;
+  if (!accuracyOk || !fieldsOk) {
+    var msg = document.getElementById('campo-msg');
+    msg.className = 'msg msg-error';
+    msg.textContent = 'Preenche os campos e as 2 fotos obrigatórias antes de vincular.';
+    return;
+  }
+  document.getElementById('campo-duplicado-box').style.display = 'none';
+  campoDoSubmit();
+});
+document.getElementById('btn-duplicado-nova').addEventListener('click', function() {
+  var box = document.getElementById('campo-duplicado-justificacao');
+  box.style.display = 'block';
+  box.oninput = function() {
+    campoDuplicateOverrideReason = box.value.trim().length >= 10 ? box.value.trim() : null;
+    campoUpdateSubmitState();
+  };
+});
+
+// Redimensiona, marca de água (Plus Code + data/hora) e comprime a foto antes de enviar
+function campoSetupPhotoInput(inputId, statusId, previewId, onDone) {
+  document.getElementById(inputId).addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    var statusEl = document.getElementById(statusId);
+    var preview = document.getElementById(previewId);
+    if (!file) return;
+    if (!campoLocation) {
+      statusEl.className = 'msg msg-error'; statusEl.textContent = 'Captura o GPS antes de tirar a foto.';
+      e.target.value = ''; return;
+    }
+    statusEl.className = 'msg msg-muted'; statusEl.textContent = 'A processar a foto...';
+
+    var img = new Image();
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      img.onload = function() {
+        var maxDim = 1280;
+        var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        var w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+
+        var barHeight = Math.max(30, Math.round(h * 0.07));
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillRect(0, h - barHeight, w, barHeight);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = Math.round(barHeight * 0.32) + 'px sans-serif';
+        ctx.textBaseline = 'middle';
+        var when = new Date().toLocaleString('pt-PT');
+        ctx.fillText('📍 ' + campoLocation.plusCode + '  ·  ' + campoLocation.lat.toFixed(5) + ', ' + campoLocation.lng.toFixed(5), 10, h - barHeight * 0.68);
+        ctx.fillText(when, 10, h - barHeight * 0.28);
+
+        canvas.toBlob(function(blob) {
+          preview.src = URL.createObjectURL(blob);
+          preview.style.display = 'block';
+          statusEl.className = 'msg msg-muted';
+          statusEl.textContent = 'A enviar foto (' + Math.round(blob.size / 1024) + ' KB)...';
+
+          var fileName = campoDeviceId + '-' + inputId + '-' + Date.now() + '.jpg';
+          fetch(SUPABASE_URL + '/storage/v1/object/field-photos/' + fileName, {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + session.access_token, 'apikey': ANON_KEY, 'Content-Type': 'image/jpeg' },
+            body: blob
+          }).then(function(r) {
+            if (r.ok) {
+              var url = SUPABASE_URL + '/storage/v1/object/public/field-photos/' + fileName;
+              onDone(url);
+              statusEl.className = 'msg msg-success';
+              statusEl.textContent = 'Foto pronta (' + Math.round(blob.size / 1024) + ' KB).';
+              campoUpdateSubmitState();
+            } else {
+              return r.json().then(function(data) {
+                statusEl.className = 'msg msg-error'; statusEl.textContent = 'Erro ao enviar: ' + (data.message || data.error || r.status);
+              });
+            }
+          }).catch(function() { statusEl.className = 'msg msg-error'; statusEl.textContent = 'Erro de ligação.'; });
+        }, 'image/jpeg', 0.65);
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+campoSetupPhotoInput('campo-photo-facade-input', 'campo-photo-facade-status', 'campo-photo-facade-preview', function(url) { campoPhotoFacadeUrl = url; });
+campoSetupPhotoInput('campo-photo-qr-input', 'campo-photo-qr-status', 'campo-photo-qr-preview', function(url) { campoPhotoQrUrl = url; });
+
+function campoResetForm() {
+  ['campo-house', 'campo-street', 'campo-neighborhood', 'campo-reference', 'campo-precisao-justificacao', 'campo-duplicado-justificacao'].forEach(function(id) { document.getElementById(id).value = ''; });
+  document.getElementById('campo-street').disabled = false;
+  document.getElementById('campo-street-sem-nome').checked = false;
+  campoStreetNoName = false;
+  campoLocation = null; campoPhotoFacadeUrl = null; campoPhotoQrUrl = null;
+  campoDuplicate = null; campoDuplicateOverrideReason = null;
+  document.getElementById('campo-gps-value').textContent = '';
+  document.getElementById('campo-gps-card').style.display = 'none';
+  document.getElementById('campo-duplicado-box').style.display = 'none';
+  document.getElementById('campo-duplicado-justificacao').style.display = 'none';
+  ['campo-photo-facade-preview', 'campo-photo-qr-preview'].forEach(function(id) { document.getElementById(id).style.display = 'none'; });
+  ['campo-photo-facade-status', 'campo-photo-qr-status', 'campo-photo-facade-input', 'campo-photo-qr-input'].forEach(function(id) { document.getElementById(id).value = ''; });
+  campoUpdateSubmitState();
+}
+
+function campoDoSubmit() {
+  var msg = document.getElementById('campo-msg');
+  msg.className = 'msg msg-muted'; msg.textContent = 'A enviar...';
+
+  fetch(SUPABASE_URL + '/functions/v1/field-service?action=submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+    body: JSON.stringify({
+      device_id: campoDeviceId, latitude: campoLocation.lat, longitude: campoLocation.lng,
+      house_number: document.getElementById('campo-house').value.trim(),
+      street_name: document.getElementById('campo-street').value.trim(),
+      neighborhood_name: document.getElementById('campo-neighborhood').value.trim(),
+      reference: document.getElementById('campo-reference').value.trim(),
+      photo_facade_url: campoPhotoFacadeUrl, photo_qr_url: campoPhotoQrUrl,
+      accuracy_meters: campoLocation.accuracy,
+      accuracy_justification: document.getElementById('campo-precisao-justificacao').value.trim() || null,
+      no_official_name: campoStreetNoName,
+      override_duplicate: !!campoDuplicateOverrideReason,
+      duplicate_justification: campoDuplicateOverrideReason
+    })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.error) { msg.className = 'msg msg-error'; msg.textContent = data.error; return; }
+    msg.textContent = '';
+    document.getElementById('campo-sucesso-codigo').textContent = campoLocation.postalCodePreview || '-';
+    document.getElementById('campo-sucesso-card').style.display = 'block';
+    campoLoadDailyCount();
+  }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
+}
+
+document.getElementById('btn-campo-enviar').addEventListener('click', campoDoSubmit);
+
+document.getElementById('btn-campo-proxima-porta').addEventListener('click', function() {
+  document.getElementById('campo-sucesso-card').style.display = 'none';
+  campoResetForm();
+  campoCaptureGps();
+});
+
+
+
+// ---- Validar (Supervisor/Admin) ----
+function loadValidar() {
+  if (!session) return;
+  var list = document.getElementById('validar-list');
+  var empty = document.getElementById('validar-empty');
+  list.innerHTML = '<p class="msg msg-muted">A carregar...</p>';
+  empty.style.display = 'none';
+
+  fetch(SUPABASE_URL + '/functions/v1/field-service?action=list_pending', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+    body: '{}'
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    var rows = data.records || [];
+    list.innerHTML = '';
+    if (rows.length === 0) { empty.style.display = 'block'; return; }
+    rows.forEach(function(rec) {
+      var div = document.createElement('div');
+      div.className = 'list-item';
+      var isDuplicate = rec.status === 'DUPLICATE';
+      var actions = isDuplicate
+        ? '<button data-id="' + rec.id + '" data-decision="merge" class="validar-btn btn btn-success-solid btn-sm">Fundir com existente</button>' +
+          '<button data-id="' + rec.id + '" data-decision="approve" class="validar-btn btn btn-secondary btn-sm">Aceitar como novo</button>' +
+          '<button data-id="' + rec.id + '" data-decision="reject" class="validar-btn btn btn-danger-outline btn-sm">Rejeitar</button>'
+        : '<button data-id="' + rec.id + '" data-decision="approve" class="validar-btn btn btn-success-solid btn-sm">Aprovar</button>' +
+          '<button data-id="' + rec.id + '" data-decision="duplicate" class="validar-btn btn btn-secondary btn-sm">Duplicado</button>' +
+          '<button data-id="' + rec.id + '" data-decision="reject" class="validar-btn btn btn-danger-outline btn-sm">Rejeitar</button>';
+      div.innerHTML =
+        (isDuplicate ? '<div style="color:var(--danger);font-size:11px;font-weight:600;margin-bottom:4px;">⚠️ POSSÍVEL DUPLICADO' + (rec.duplicate_override_reason ? ' — agente diz: "' + rec.duplicate_override_reason + '"' : '') + '</div>' : '') +
+        '<div class="value-plain">' + (rec.house_number || '') + ' ' + (rec.street_name || '(rua não indicada)') + '</div>' +
+        '<div style="font-size:11.5px;color:var(--text-dim);margin:2px 0 8px;">' + (rec.neighborhood_name || '') + ' · ' + rec.latitude.toFixed(4) + ', ' + rec.longitude.toFixed(4) + '</div>' +
+        '<div class="btn-row">' + actions + '</div>';
+      list.appendChild(div);
+    });
+    document.querySelectorAll('.validar-btn').forEach(function(b) {
+      b.addEventListener('click', function() {
+        fetch(SUPABASE_URL + '/functions/v1/field-service?action=validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+          body: JSON.stringify({ field_record_id: b.dataset.id, decision: b.dataset.decision })
+        }).then(function() { loadValidar(); });
+      });
+    });
+  }).catch(function() { list.innerHTML = '<p class="msg msg-error">Erro ao carregar.</p>'; });
+}
+</script>
+</body>
+</html>
