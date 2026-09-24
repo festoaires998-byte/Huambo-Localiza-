@@ -1550,13 +1550,21 @@ document.getElementById('btn-rastreio-voltar').addEventListener('click', functio
   window.location.href = window.location.origin + window.location.pathname;
 });
 
+// Texto vindo da base de dados nunca entra como HTML.
+function escaparHtml(t) {
+  return String(t == null ? '' : t).replace(/[&<>"']/g, function(c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+// Cartão público (pesquisa?action=cartao): só moradas aprovadas que não são privadas.
 function renderizarMoradaPublica(box, a) {
-  var linha = a.streets ? a.streets.name + (a.quadras ? ' · Quadra ' + a.quadras.code : '') + (a.house_number ? ' · nº ' + a.house_number : '') : '';
+  var linha = a.rua ? a.rua + (a.quadra ? ' · Quadra ' + a.quadra : '') + (a.house_number ? ' · nº ' + a.house_number : '') : '';
   box.innerHTML = '<div class="card" style="text-align:center;">' +
-    '<div class="label-caps">Código postal digital</div><div class="value-md">' + a.postal_code + '</div>' +
-    (a.plus_code ? '<div class="label-caps" style="margin-top:var(--sp-3);">Plus Code</div><div class="value-plain" style="color:var(--accent);">' + a.plus_code + '</div>' : '') +
-    (linha ? '<div class="label-caps" style="margin-top:var(--sp-3);">Morada</div><div class="value-plain">' + linha + '</div>' : '') +
-    (a.reference ? '<div class="label-caps" style="margin-top:var(--sp-3);">Referência</div><div class="value-plain">' + a.reference + '</div>' : '') +
+    '<div class="label-caps">Código postal digital</div><div class="value-md">' + escaparHtml(a.postal_code) + '</div>' +
+    (a.plus_code ? '<div class="label-caps" style="margin-top:var(--sp-3);">Plus Code</div><div class="value-plain" style="color:var(--accent);">' + escaparHtml(a.plus_code) + '</div>' : '') +
+    (linha ? '<div class="label-caps" style="margin-top:var(--sp-3);">Morada</div><div class="value-plain">' + escaparHtml(linha) + '</div>' : '') +
+    (a.reference ? '<div class="label-caps" style="margin-top:var(--sp-3);">Referência</div><div class="value-plain">' + escaparHtml(a.reference) + '</div>' : '') +
     '</div>';
 }
 
@@ -1564,11 +1572,11 @@ var pendingEnderecoQuery = new URLSearchParams(location.search).get('endereco');
 if (pendingEnderecoQuery) {
   document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('visible'); });
   document.getElementById('view-endereco-publico').classList.add('visible');
-  fetch(SUPABASE_URL + '/functions/v1/resolve-address', {
+  fetch(SUPABASE_URL + '/functions/v1/pesquisa?action=cartao', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY }, body: JSON.stringify({ query: pendingEnderecoQuery })
   }).then(function(r) { return r.json(); }).then(function(data) {
     var box = document.getElementById('endereco-conteudo');
-    if (!data.found) { box.innerHTML = '<p class="msg msg-error" style="text-align:center;">Não encontrei nenhuma morada com esse código.</p>'; return; }
+    if (!data.found) { box.innerHTML = '<p class="msg msg-error" style="text-align:center;">Não encontrei nenhuma morada pública com esse código.</p>'; return; }
     renderizarMoradaPublica(box, data.address);
   }).catch(function() { document.getElementById('endereco-conteudo').innerHTML = '<p class="msg msg-error" style="text-align:center;">Erro de ligação.</p>'; });
 }
@@ -2617,38 +2625,47 @@ document.getElementById('btn-save-favorite').addEventListener('click', function(
   });
 });
 
-// ---- Pesquisa (Fase 7, agora ligada ao ecrã) ----
+// ---- Pesquisa (função "pesquisa": só com sessão; respeita a privacidade) ----
+var TIPOS_RESULTADO = { morada: 'Morada', rua: 'Rua', bairro: 'Bairro' };
+function pesquisar(q) {
+  return fetch(SUPABASE_URL + '/functions/v1/pesquisa', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+    body: JSON.stringify({ query: q })
+  }).then(function(r) { return r.json(); });
+}
+// Mostra os resultados na caixa; ao tocar num com posição, leva o mapa até lá.
+function mostrarResultadosPesquisa(box, data) {
+  box.innerHTML = '';
+  if (data.error) { box.innerHTML = '<p class="msg msg-error">' + escaparHtml(data.error) + '</p>'; return; }
+  var results = data.resultados || [];
+  if (results.length === 0) { box.innerHTML = '<p class="msg msg-muted">Sem resultados.</p>'; return; }
+  results.forEach(function(r) {
+    var div = document.createElement('div');
+    div.className = 'list-item';
+    var temPonto = typeof r.latitude === 'number' && typeof r.longitude === 'number';
+    div.innerHTML = '<div class="value-plain">' + escaparHtml(r.titulo) + '</div>' +
+      '<div style="font-size:11.5px;color:var(--text-dim);">' + escaparHtml([TIPOS_RESULTADO[r.tipo] || r.tipo, r.subtitulo].filter(Boolean).join(' · ')) + '</div>' +
+      (temPonto ? '' : '<div style="font-size:11px;color:var(--text-faint);">Ainda sem posição no mapa</div>');
+    if (temPonto) {
+      div.style.cursor = 'pointer';
+      div.addEventListener('click', function() { if (mapInstance) { mapInstance.setView([r.latitude, r.longitude], 17); } });
+    }
+    box.appendChild(div);
+  });
+}
+
 var searchTimer = null;
 document.getElementById('search-input').addEventListener('input', function() {
   var q = this.value.trim();
   clearTimeout(searchTimer);
   var resultsBox = document.getElementById('search-results');
   if (q.length < 3) { resultsBox.innerHTML = ''; return; }
+  if (!session) { resultsBox.innerHTML = '<p class="msg msg-muted">Entra na tua conta para pesquisar.</p>'; return; }
   searchTimer = setTimeout(function() {
     resultsBox.innerHTML = '<p class="msg msg-muted">A pesquisar...</p>';
-    fetch(SUPABASE_URL + '/functions/v1/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + (session ? session.access_token : ANON_KEY) },
-      body: JSON.stringify({ query: q, user_id: session ? parseJwt(session.access_token).sub : null })
-    }).then(function(r) { return r.json(); }).then(function(data) {
-      resultsBox.innerHTML = '';
-      var results = data.results || [];
-      if (results.length === 0) { resultsBox.innerHTML = '<p class="msg msg-muted">Sem resultados.</p>'; return; }
-      results.slice(0, 8).forEach(function(r) {
-        var div = document.createElement('div');
-        div.className = 'list-item';
-        var title = r.postal_code || r.name || r.reference || 'resultado';
-        var subtitle = r.kind || r.status || '';
-        div.innerHTML = '<div class="value-plain">' + title + '</div><div style="font-size:11.5px;color:var(--text-dim);">' + subtitle + '</div>';
-        if (r.latitude && r.longitude) {
-          div.style.cursor = 'pointer';
-          div.addEventListener('click', function() {
-            if (mapInstance) { mapInstance.setView([r.latitude, r.longitude], 17); }
-          });
-        }
-        resultsBox.appendChild(div);
-      });
-    }).catch(function() { resultsBox.innerHTML = '<p class="msg msg-error">Erro na pesquisa.</p>'; });
+    pesquisar(q).then(function(data) { mostrarResultadosPesquisa(resultsBox, data); })
+      .catch(function() { resultsBox.innerHTML = '<p class="msg msg-error">Erro na pesquisa.</p>'; });
   }, 400);
 });
 
@@ -3286,32 +3303,11 @@ var registarLocalStream = null, registarLocalFotoUrl = null, registarLocalRuas =
 document.getElementById('btn-pesquisar-morada').addEventListener('click', function() {
   var texto = document.getElementById('pesquisa-morada-input').value.trim();
   var box = document.getElementById('pesquisa-morada-resultado');
-  if (!texto) { box.innerHTML = '<p class="msg msg-error">Escreve um código ou "Rua, número".</p>'; return; }
+  if (texto.length < 3) { box.innerHTML = '<p class="msg msg-error">Escreve um código ou "Rua, número" (pelo menos 3 letras).</p>'; return; }
+  if (!session) { box.innerHTML = '<p class="msg msg-error">Entra na tua conta para pesquisar.</p>'; return; }
   box.innerHTML = '<p class="msg msg-muted">A procurar...</p>';
-
-  var payload = {};
-  var partes = texto.split(',');
-  if (partes.length === 2 && partes[1].trim().match(/^\d/)) {
-    payload.street_name = partes[0].trim();
-    payload.house_number = partes[1].trim();
-  } else {
-    payload.query = texto;
-  }
-
-  fetch(SUPABASE_URL + '/functions/v1/resolve-address', {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY }, body: JSON.stringify(payload)
-  }).then(function(r) { return r.json(); }).then(function(data) {
-    if (!data.found) { box.innerHTML = '<p class="msg msg-error">Não encontrei nenhuma morada. Tenta o código postal completo, ou "Rua X, 12".</p>'; return; }
-    var a = data.address;
-    var linha = a.streets ? a.streets.name + (a.house_number ? ' · nº ' + a.house_number : '') : '';
-    box.innerHTML = '<div class="card">' +
-      '<div class="label-caps">Encontrado</div>' +
-      '<div class="value-md" style="color:var(--accent);">' + a.postal_code + '</div>' +
-      (a.plus_code ? '<div style="font-size:11px;color:var(--text-faint);">' + a.plus_code + '</div>' : '') +
-      (linha ? '<div style="font-size:12.5px;margin-top:6px;">' + linha + '</div>' : '') +
-      (a.reference ? '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">📍 ' + a.reference + '</div>' : '') +
-      '</div>';
-  }).catch(function() { box.innerHTML = '<p class="msg msg-error">Erro de ligação.</p>'; });
+  pesquisar(texto).then(function(data) { mostrarResultadosPesquisa(box, data); })
+    .catch(function() { box.innerHTML = '<p class="msg msg-error">Erro de ligação.</p>'; });
 });
 
 document.getElementById('btn-abrir-registar-local').addEventListener('click', function() {
