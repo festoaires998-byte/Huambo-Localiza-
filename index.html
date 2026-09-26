@@ -209,11 +209,11 @@
   .panel { display: none; padding: var(--sp-4) var(--sp-4) var(--sp-5); }
   .panel.visible { display: block; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 </style>
-  <meta name="al-build-id" content="20260926-sync-20260926-0194662">
+  <meta name="al-build-id" content="20260926-sync-02">
 </head>
 <body>
 <script>
-var APP_BUILD_ID = "20260926-sync-20260926-0194662";
+var APP_BUILD_ID = "20260926-sync-02";
 (function verificarVersaoPublicada(){
   var KEY='al_build_reload_at';
   function check(){
@@ -3054,6 +3054,10 @@ function alRefreshOperationalViews(force) {
 document.addEventListener('visibilitychange', function(){ if (!document.hidden) alRefreshOperationalViews(true); });
 window.addEventListener('focus', function(){ alRefreshOperationalViews(true); });
 window.addEventListener('online', function(){ setTimeout(function(){ alRefreshOperationalViews(true); }, 600); });
+// Sincronização periódica como fallback para módulos que usam consultas normais.
+var alOperationalSyncTimer = setInterval(function(){
+  if (!document.hidden && navigator.onLine) alRefreshOperationalViews(false);
+}, 15000);
 
 document.getElementById('btn-marketplace-minhas-entregas').addEventListener('click', function(){
   var btn=document.getElementById('tab-btn-minhas-entregas');
