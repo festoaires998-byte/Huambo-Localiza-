@@ -5,7 +5,7 @@
 // (ex.: 'v1' -> 'v2'). Sem isso, quem já tiver a app instalada fica preso
 // à versão antiga para sempre, porque o telemóvel nunca mais volta a
 // perguntar ao servidor se há algo novo.
-const CACHE_NAME = 'angola-localiza-v5';
+const CACHE_NAME = 'angola-localiza-v6';
 
 // Bibliotecas externas: mudam muito raramente, por isso podem ficar em
 // cache "à vontade" (cache-first) sem risco de ficares preso numa versão antiga.
