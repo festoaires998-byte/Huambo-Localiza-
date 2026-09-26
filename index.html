@@ -2866,8 +2866,13 @@ function loadMarketplace() {
       var options = estafetas.map(function(e){ return '<option value="'+e.id+'">'+(e.email || e.id)+'</option>'; }).join('');
       deliveries.forEach(function(d){
         var div=document.createElement('div'); div.className='list-item';
+        var addr=d.addresses||{};
+        var conf=entregaTerritorialConfidence(addr);
+        var confText='Confiança territorial: '+conf.label+(conf.score!=null?' ('+conf.score+'/100)':'');
+        var confClass=(conf.label==='Baixa'||conf.label==='Requer atenção')?'msg msg-error':'msg msg-muted';
         div.innerHTML='<div class="value-md" style="color:var(--accent);font-weight:700;">'+(d.tracking_code||d.id)+'</div>'+
-          '<div style="font-size:11.5px;color:var(--text-dim);margin:3px 0 8px;">'+(d.recipient_name||'Destinatário não indicado')+'</div>'+
+          '<div style="font-size:11.5px;color:var(--text-dim);margin:3px 0 6px;">'+(d.recipient_name||'Destinatário não indicado')+'</div>'+
+          '<div class="'+confClass+'" style="margin:0 0 8px;">📍 '+confText+(addr.flagged_for_review?' · marcada para revisão':'')+'</div>'+
           (options ? '<select class="input marketplace-assign-select" style="height:40px;margin-bottom:8px;">'+options+'</select><button data-delivery="'+d.id+'" class="marketplace-assign-btn btn btn-success-solid btn-sm">Atribuir estafeta</button>' : '<p class="msg msg-muted">Sem estafetas disponíveis para atribuição.</p>');
         list.appendChild(div);
       });
