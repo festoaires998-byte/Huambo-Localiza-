@@ -601,8 +601,12 @@
         </div>
 
         <div id="entrega-risco-banner" style="display:none;background:rgba(240,153,123,0.12);border:1px solid var(--danger);border-radius:10px;padding:10px 12px;">
-          <div style="color:var(--danger);font-size:12.5px;font-weight:600;">⚠️ Este ponto ainda não está totalmente verificado.</div>
-          <div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">Confirma os dados antes de confiar uma entrega importante a este destino.</div>
+          <div style="color:var(--danger);font-size:12.5px;font-weight:600;">⚠️ Este ponto requer atenção.</div>
+          <div id="entrega-risco-texto" style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">Confirma os dados antes de confiar uma entrega importante a este destino.</div>
+          <label style="display:flex;align-items:flex-start;gap:8px;margin-top:8px;font-size:11.5px;color:var(--text);cursor:pointer;">
+            <input type="checkbox" id="entrega-risco-ack" style="margin-top:2px;" />
+            <span>Confirmo que revi o destino e quero continuar com esta entrega.</span>
+          </label>
         </div>
         <div id="deixa-aqui-box" class="card" style="display:none;margin-top:var(--sp-3);">
           <div style="font-weight:700;">📍 Deixa Aqui</div>
@@ -3354,6 +3358,8 @@ function entregaSetDestino(addressId, addr, sourceType) {
   entregaDestinoAtual = entregaNormalizarPonto(addr, sourceType || 'address', addressId);
   entregaMostrarChip('destino', entregaDestinoAtual);
   var banner = document.getElementById('entrega-risco-banner');
+  var riskAck = document.getElementById('entrega-risco-ack');
+  if (riskAck) riskAck.checked = false;
   var confidence = entregaTerritorialConfidence(entregaDestinoAtual);
   var risky = entregaDestinoAtual.status === 'PROPOSED' || entregaDestinoAtual.flagged_for_review || (confidence.score != null && confidence.score < 70);
   banner.style.display = risky ? 'block' : 'none';
@@ -3622,6 +3628,7 @@ function entregaValidarContacto() {
 }
 document.getElementById('entrega-contacto').addEventListener('input',function(){entregaValidarContacto();entregaValidarFormulario();});
 document.getElementById('entrega-nome').addEventListener('input',entregaValidarFormulario);
+document.getElementById('entrega-risco-ack').addEventListener('change',entregaValidarFormulario);
 
 function entregaValidarFormulario() {
   var submitBtn = document.getElementById('btn-criar-entrega');
@@ -3631,6 +3638,10 @@ function entregaValidarFormulario() {
   if(!entregaOrigemAtual) faltam.push('local de recolha');
   if(!document.getElementById('entrega-nome').value.trim()) faltam.push('nome de quem recebe');
   if(!entregaValidarContacto()) faltam.push('contacto em formato válido');
+  var riskAck = document.getElementById('entrega-risco-ack');
+  var confidence = entregaTerritorialConfidence(entregaDestinoAtual);
+  var risky = entregaDestinoAtual && (entregaDestinoAtual.status === 'PROPOSED' || entregaDestinoAtual.flagged_for_review || (confidence.score != null && confidence.score < 70));
+  if (risky && riskAck && !riskAck.checked) faltam.push('confirmação do destino');
   document.getElementById('btn-criar-entrega').disabled=faltam.length>0;
   document.getElementById('entrega-btn-motivo').textContent=faltam.length?'Faltam: '+faltam.join(' · '):'';
 }
