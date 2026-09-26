@@ -1414,9 +1414,6 @@ function setRealtimeAuth() {
   if (alRealtimeClient && session && session.access_token) {
     try {
       alRealtimeClient.realtime.setAuth(session.access_token);
-      if (alRealtimeClient.auth && alRealtimeClient.auth.setSession) {
-        alRealtimeClient.auth.setSession({ access_token: session.access_token, refresh_token: '' }).catch(function(){});
-      }
     } catch (e) {}
   }
 }
