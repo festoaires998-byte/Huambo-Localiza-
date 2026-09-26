@@ -3080,6 +3080,21 @@ function entregaLabelPonto(ponto) {
   return ponto.postal_code || ponto.plus_code || ponto.reference || (ponto.latitude != null ? (Number(ponto.latitude).toFixed(5) + ', ' + Number(ponto.longitude).toFixed(5)) : 'Ponto');
 }
 
+function entregaTerritorialConfidence(ponto) {
+  ponto = ponto || {};
+  var score = ponto.confidence_score == null ? null : Number(ponto.confidence_score);
+  var status = String(ponto.status || '').toUpperCase();
+  if (status === 'PROPOSED' || ponto.flagged_for_review) return { label:'Requer atenção', score:isFinite(score) ? Math.round(score) : null };
+  if (isFinite(score)) {
+    score = Math.max(0, Math.min(100, Math.round(score)));
+    if (score >= 90) return { label:'Alta', score:score };
+    if (score >= 70) return { label:'Moderada', score:score };
+    return { label:'Baixa', score:score };
+  }
+  if (status === 'APPROVED' || status === 'OFFICIAL' || status === 'PUBLISHED') return { label:'Verificada', score:null };
+  return { label:'Ainda sem classificação', score:null };
+}
+
 function entregaNormalizarPonto(ponto, sourceType, refId) {
   ponto = ponto || {};
   var out = Object.assign({}, ponto);
@@ -3100,6 +3115,8 @@ function entregaMostrarChip(tipo, ponto) {
   if (ponto.plus_code) detalhe.push('Plus Code: ' + ponto.plus_code);
   if (ponto.latitude != null && ponto.longitude != null) detalhe.push(Number(ponto.latitude).toFixed(5) + ', ' + Number(ponto.longitude).toFixed(5));
   if (ponto.status) detalhe.push('Estado: ' + ({PROPOSED:'PROPOSTA',APPROVED:'VERIFICADA',OFFICIAL:'VERIFICADA',PUBLISHED:'VERIFICADA'}[ponto.status] || ponto.status));
+  var conf = entregaTerritorialConfidence(ponto);
+  if (conf) detalhe.push('Confiança territorial: ' + conf.label + (conf.score != null ? ' (' + conf.score + '/100)' : ''));
   document.getElementById('entrega-' + prefix + '-chip-detalhe').textContent = detalhe.join(' · ');
 }
 
@@ -3107,8 +3124,22 @@ function entregaSetDestino(addressId, addr, sourceType) {
   entregaDestinoAtual = entregaNormalizarPonto(addr, sourceType || 'address', addressId);
   entregaMostrarChip('destino', entregaDestinoAtual);
   var banner = document.getElementById('entrega-risco-banner');
-  var risky = entregaDestinoAtual.status === 'PROPOSED' || entregaDestinoAtual.flagged_for_review;
+  var confidence = entregaTerritorialConfidence(entregaDestinoAtual);
+  var risky = entregaDestinoAtual.status === 'PROPOSED' || entregaDestinoAtual.flagged_for_review || (confidence.score != null && confidence.score < 70);
   banner.style.display = risky ? 'block' : 'none';
+  if (banner) {
+    var title = banner.querySelector('div:first-child');
+    var desc = banner.querySelector('div:nth-child(2)');
+    if (title && desc) {
+      if (confidence.label === 'Baixa') {
+        title.textContent = '⚠️ Confiança territorial baixa.';
+        desc.textContent = 'A localização tem poucos sinais de confirmação. Revê o destino antes de enviar.';
+      } else if (confidence.label === 'Requer atenção') {
+        title.textContent = '⚠️ Este ponto requer atenção.';
+        desc.textContent = 'A morada está proposta ou marcada para revisão. Confirma os dados antes de enviar.';
+      }
+    }
+  }
   entregaAtualizarPreco();
   entregaValidarFormulario();
 }
@@ -3124,7 +3155,7 @@ function loadEntregaDestinos() {
   if (!session) return;
   var sel = document.getElementById('entrega-destino');
   sel.innerHTML = '<option value="">A carregar...</option>';
-  fetch(SUPABASE_URL + '/rest/v1/favorites?select=address_id,addresses(id,postal_code,plus_code,reference,status,flagged_for_review,municipality_id,province_id,latitude,longitude)&order=created_at.desc', {
+  fetch(SUPABASE_URL + '/rest/v1/favorites?select=address_id,addresses(id,postal_code,plus_code,reference,status,flagged_for_review,municipality_id,province_id,latitude,longitude,confidence_score,accuracy_meters,validated_at,quadra_id,street_id)&order=created_at.desc', {
     headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
   }).then(function(r) { return r.json(); }).then(function(rows) {
     entregaDestinosCache = {}; entregaOrigensCache = {};
