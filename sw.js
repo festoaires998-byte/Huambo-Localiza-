@@ -5,7 +5,7 @@
 // (ex.: 'v1' -> 'v2'). Sem isso, quem já tiver a app instalada fica preso
 // à versão antiga para sempre, porque o telemóvel nunca mais volta a
 // perguntar ao servidor se há algo novo.
-const CACHE_NAME = 'angola-localiza-v8';
+const CACHE_NAME = 'angola-localiza-v9';
 
 // Bibliotecas externas: mudam muito raramente, por isso podem ficar em
 // cache "à vontade" (cache-first) sem risco de ficares preso numa versão antiga.
@@ -34,7 +34,6 @@ self.addEventListener('install', function (event) {
       return cache.addAll(FICHEIROS_DO_SITE.concat(BIBLIOTECAS_EXTERNAS));
     })
   );
-  self.skipWaiting(); // ativa a versão nova assim que possível, não espera todas as abas fecharem
 });
 
 // Ao ativar, apaga caches de versões antigas (senão vão-se acumulando para sempre)
@@ -47,7 +46,6 @@ self.addEventListener('activate', function (event) {
       );
     })
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', function (event) {
