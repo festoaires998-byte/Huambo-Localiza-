@@ -1380,6 +1380,10 @@ function stopDeliveryRealtime(deliveryId) {
     clearTimeout(realtimeDeliveryRetryTimers[deliveryId]);
     delete realtimeDeliveryRetryTimers[deliveryId];
   }
+  if (deliveryTrackingWatches[deliveryId] != null) {
+    try { navigator.geolocation.clearWatch(deliveryTrackingWatches[deliveryId]); } catch (e) {}
+    delete deliveryTrackingWatches[deliveryId];
+  }
   delete deliveryTrackingLastSent[deliveryId];
 }
 
