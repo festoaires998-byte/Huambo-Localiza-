@@ -1511,6 +1511,75 @@ function toggleDeliveryLocationSharing(deliveryId, button) {
 }
 
 
+// Configuração territorial em runtime: a interface não assume que o nível local se chama "Bairro".
+// O contrato legado do backend (neighborhood_name) permanece intacto nesta fase.
+window.AL_COUNTRY_RUNTIME = {
+  countryCode: 'AO',
+  localityLabel: 'Bairro',
+  localityPlural: 'Bairros',
+  localityFeminine: false,
+  ready: Promise.resolve()
+};
+(function loadCountryRuntime(){
+  function aplicar(){
+    var r=window.AL_COUNTRY_RUNTIME;
+    var label=r.localityLabel, plural=r.localityPlural;
+    var lower=label.toLocaleLowerCase('pt-PT');
+    var article=r.localityFeminine?'a':'o';
+    var other=r.localityFeminine?'Outra':'Outro';
+    var select=document.getElementById('registar-local-bairro');
+    var campo=document.getElementById('campo-neighborhood-select');
+    var novo=document.getElementById('registar-local-bairro-novo');
+    var novoCampo=document.getElementById('campo-neighborhood-new-name');
+    var search=document.getElementById('search-input');
+    if(search) search.placeholder='Pesquisar código, Plus Code, rua, '+lower+'...';
+    [select,campo].forEach(function(el){
+      if(!el) return;
+      var field=el.closest('.field');
+      var lab=field && field.querySelector('label');
+      if(lab){ var nextLabel=lab.textContent.replace(/Bairro/g,label); if(lab.textContent!==nextLabel) lab.textContent=nextLabel; }
+      Array.prototype.forEach.call(el.options,function(o){
+        var next=o.textContent
+          .replace(/Escolhe um bairro/gi,'Escolhe '+article+' '+lower)
+          .replace(/Novo bairro/gi,other+' '+lower)
+          .replace(/Outro bairro/gi,other+' '+lower)
+          .replace(/Bairro sem nome/gi,label+' sem nome')
+          .replace(/A carregar bairros/gi,'A carregar '+plural.toLocaleLowerCase('pt-PT'));
+        if(o.textContent!==next) o.textContent=next;
+      });
+    });
+    if(novo) novo.placeholder='Nome '+lower;
+    if(novoCampo) novoCampo.placeholder='Nome '+lower;
+  }
+  function carregar(){
+    var headers={apikey:ANON_KEY,Authorization:'Bearer '+ANON_KEY};
+    return fetch(SUPABASE_URL+'/rest/v1/country_configs?select=country_code,name,native_name,locale&country_code=eq.AO&enabled=eq.true&limit=1',{headers:headers})
+      .then(function(res){ if(!res.ok) throw new Error('country_configs '+res.status); return res.json(); })
+      .then(function(countries){
+        if(!countries || !countries[0]) return;
+        return fetch(SUPABASE_URL+'/rest/v1/country_territorial_levels?select=level_key,label,plural_label,level_order,is_locality&country_code=eq.'+encodeURIComponent(countries[0].country_code)+'&is_locality=eq.true&order=level_order.asc&limit=1',{headers:headers})
+          .then(function(res){ if(!res.ok) throw new Error('country_territorial_levels '+res.status); return res.json(); })
+          .then(function(levels){
+            if(!levels || !levels[0] || !levels[0].label) return;
+            var level=levels[0];
+            var label=String(level.label).trim();
+            var feminine=/^(Ilha|Zona|Região|Secção|Localidade|Tabanca)$/i.test(label);
+            window.AL_COUNTRY_RUNTIME.countryCode=countries[0].country_code;
+            window.AL_COUNTRY_RUNTIME.localityLabel=label;
+            window.AL_COUNTRY_RUNTIME.localityPlural=String(level.plural_label||label).trim();
+            window.AL_COUNTRY_RUNTIME.localityFeminine=feminine;
+          });
+      })
+      .catch(function(){ /* fallback seguro: Angola/Bairro */ })
+      .then(function(){ aplicar(); });
+  }
+  window.AL_COUNTRY_RUNTIME.ready=carregar();
+  if(window.MutationObserver){
+    var observar=function(id){ var el=document.getElementById(id); if(!el)return; new MutationObserver(aplicar).observe(el,{childList:true,subtree:true}); };
+    setTimeout(function(){ observar('registar-local-bairro'); observar('campo-neighborhood-select'); aplicar(); },0);
+  }
+})();
+
 // Câmara global: qualquer stream aberta é registada para poder ser encerrada
 // imediatamente quando o utilizador muda de separador.
 var activeCameraStreams = [];
