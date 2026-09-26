@@ -6625,7 +6625,7 @@ document.getElementById('btn-quadra-fechar').addEventListener('click', function(
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
-      navigator.serviceWorker.register('sw.js')
+      navigator.serviceWorker.register('sw.js?v=20260926-3')
         .then(function() { console.log('Motor offline (PWA) ativado com sucesso!'); })
         .catch(function(err) { console.error('Erro ao ativar o PWA:', err); });
     });
