@@ -601,6 +601,13 @@
           <div style="color:var(--danger);font-size:12.5px;font-weight:600;">⚠️ Este ponto ainda não está totalmente verificado.</div>
           <div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">Confirma os dados antes de confiar uma entrega importante a este destino.</div>
         </div>
+        <div id="deixa-aqui-box" class="card" style="display:none;margin-top:var(--sp-3);">
+          <div style="font-weight:700;">📍 Deixa Aqui</div>
+          <p style="font-size:11.5px;color:var(--text-dim);margin:4px 0 8px;">Pontos autorizados próximos deste destino. A entrega normal não é alterada.</p>
+          <button id="btn-procurar-deixa-aqui" class="btn btn-secondary btn-sm" type="button">Procurar pontos próximos</button>
+          <div id="deixa-aqui-list" class="stack-sm" style="margin-top:8px;"></div>
+          <p id="deixa-aqui-msg" class="msg" style="margin-top:6px;"></p>
+        </div>
 
         <div id="entrega-preco-preview" style="display:none;background:var(--surface-2);border-radius:10px;padding:10px 14px;">
           <div class="label-caps">Preço</div>
@@ -3120,6 +3127,49 @@ function entregaMostrarChip(tipo, ponto) {
   document.getElementById('entrega-' + prefix + '-chip-detalhe').textContent = detalhe.join(' · ');
 }
 
+function deixaAquiEscapar(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, function(ch) {
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch];
+  });
+}
+
+function deixaAquiRender(rows) {
+  var list=document.getElementById('deixa-aqui-list');
+  if(!list)return;
+  list.innerHTML='';
+  (rows||[]).forEach(function(p){
+    var card=document.createElement('div');
+    card.className='list-item';
+    card.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">' +
+      '<div><div class="value-md">'+deixaAquiEscapar(p.name)+'</div>' +
+      '<div style="font-size:11px;color:var(--text-dim);margin-top:3px;">'+deixaAquiEscapar(p.point_type||'Ponto')+' · '+Math.round(Number(p.distance_meters||0))+' m</div>' +
+      (p.instructions?'<div style="font-size:11px;color:var(--text-dim);margin-top:3px;">'+deixaAquiEscapar(p.instructions)+'</div>':'')+
+      '</div><span class="badge">Ativo</span></div>';
+    list.appendChild(card);
+  });
+}
+
+function procurarDeixaAqui() {
+  var box=document.getElementById('deixa-aqui-box'), list=document.getElementById('deixa-aqui-list'), msg=document.getElementById('deixa-aqui-msg');
+  if(!box||!list||!msg)return;
+  var p=entregaDestinoAtual||{};
+  if(p.latitude==null||p.longitude==null){
+    box.style.display='block'; list.innerHTML=''; msg.className='msg msg-muted'; msg.textContent='Este destino ainda não tem coordenadas suficientes para procurar um ponto próximo.';
+    return;
+  }
+  box.style.display='block'; msg.className='msg msg-muted'; msg.textContent='A procurar pontos próximos...'; list.innerHTML='';
+  fetch(SUPABASE_URL+'/rest/v1/rpc/find_deixa_aqui_points',{
+    method:'POST',
+    headers:{'apikey':ANON_KEY,'Authorization':'Bearer '+(session&&session.access_token?session.access_token:ANON_KEY),'Content-Type':'application/json'},
+    body:JSON.stringify({p_latitude:Number(p.latitude),p_longitude:Number(p.longitude),p_radius_meters:200})
+  }).then(function(r){return r.ok?r.json():r.json().then(function(e){throw new Error(e.message||'Erro ao procurar');});})
+  .then(function(rows){
+    deixaAquiRender(rows);
+    if(!rows||!rows.length){msg.className='msg msg-muted';msg.textContent='Não há pontos Deixa Aqui ativos num raio de 200 m.';}
+    else {msg.className='msg msg-success';msg.textContent=rows.length+' ponto(s) disponível(is) até 200 m.';}
+  }).catch(function(){msg.className='msg msg-error';msg.textContent='Não foi possível consultar os pontos Deixa Aqui agora.';});
+}
+
 function entregaSetDestino(addressId, addr, sourceType) {
   entregaDestinoAtual = entregaNormalizarPonto(addr, sourceType || 'address', addressId);
   entregaMostrarChip('destino', entregaDestinoAtual);
@@ -3142,6 +3192,7 @@ function entregaSetDestino(addressId, addr, sourceType) {
   }
   entregaAtualizarPreco();
   entregaValidarFormulario();
+  procurarDeixaAqui();
 }
 
 function entregaSetOrigem(ponto, sourceType, addressId) {
@@ -3329,6 +3380,8 @@ function entregaScanQr(tipo) {
 
 document.getElementById('btn-scan-entrega-qr').addEventListener('click', function(){ entregaScanQr('destino'); });
 document.getElementById('btn-scan-origem-qr').addEventListener('click', function(){ entregaScanQr('origem'); });
+
+document.getElementById('btn-procurar-deixa-aqui').addEventListener('click', procurarDeixaAqui);
 
 document.getElementById('btn-usar-localizacao-destino').addEventListener('click', function() {
   if (!navigator.geolocation) return;
