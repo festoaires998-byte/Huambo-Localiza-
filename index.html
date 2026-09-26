@@ -213,7 +213,7 @@
 </head>
 <body>
 <script>
-var APP_BUILD_ID = "20260926-sync-02";
+var APP_BUILD_ID = "20260926-101500";
 (function verificarVersaoPublicada(){
   var aviso=null, checking=false;
   function check(){
@@ -6700,7 +6700,7 @@ document.getElementById('btn-quadra-fechar').addEventListener('click', function(
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
-      navigator.serviceWorker.register('sw.js?v=20260926-7')
+      navigator.serviceWorker.register('sw.js?v=20260926-9')
         .then(function(reg) { reg.update(); console.log('Motor offline (PWA) ativado com sucesso!'); })
         .catch(function(err) { console.error('Erro ao ativar o PWA:', err); });
     });
