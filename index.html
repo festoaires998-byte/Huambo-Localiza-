@@ -952,6 +952,16 @@
 
       <!-- ===== OPERAÇÃO ===== -->
       <div class="admin-tab-content" data-admin-tab="operacao">
+        <div class="card" style="margin-bottom:var(--sp-4);">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+            <div>
+              <div class="label-caps">Confiança Territorial</div>
+              <div style="font-size:11.5px;color:var(--text-dim);margin-top:3px;">Histórico operacional por quadra — informativo, não é um ranking.</div>
+            </div>
+            <button id="btn-territorial-stats" class="btn btn-secondary btn-sm">📊 Consultar</button>
+          </div>
+          <div id="territorial-stats-box" style="display:none;margin-top:var(--sp-3);"></div>
+        </div>
         <div class="grid-2" style="margin-bottom:var(--sp-5);">
           <div id="stat-card-addresses" class="stat-card" style="cursor:pointer;"><div class="label-caps" style="margin:0;">Moradas</div><div id="stat-addresses" class="n">-</div></div>
           <div id="stat-card-deliveries" class="stat-card" style="cursor:pointer;"><div class="label-caps" style="margin:0;">Entregas</div><div id="stat-deliveries" class="n">-</div></div>
@@ -3959,6 +3969,27 @@ document.getElementById('btn-historico-consultar').addEventListener('click', fun
     box.innerHTML = html;
   }).catch(function() { box.innerHTML = '<p class="msg msg-error">Erro de ligação.</p>'; });
 });
+
+  document.getElementById('btn-territorial-stats').addEventListener('click', function() {
+    var box = document.getElementById('territorial-stats-box');
+    box.style.display = 'block';
+    box.innerHTML = '<p class="msg msg-muted">A consultar histórico territorial...</p>';
+    fetch(SUPABASE_URL + '/functions/v1/admin?action=territorial_stats', {
+      method:'POST', headers:{'Content-Type':'application/json','apikey':ANON_KEY,'Authorization':'Bearer '+session.access_token}, body:'{}'
+    }).then(function(r){ return r.json(); }).then(function(data) {
+      if (data.error) { box.innerHTML='<p class="msg msg-error">'+data.error+'</p>'; return; }
+      var rows=data.territorial_stats||[];
+      if (!rows.length) { box.innerHTML='<p class="msg msg-muted">Ainda não há histórico territorial suficiente.</p>'; return; }
+      box.innerHTML=rows.slice(0,12).map(function(x){
+        var pct=(x.failure_rate*100).toFixed(1);
+        var reasons=Object.entries(x.failure_reasons||{}).map(function(e){return e[0]+': '+e[1];}).join(' · ') || 'Sem falhas registadas';
+        return '<div class="list-item"><div style="font-weight:700;">Quadra '+x.quadra_id+'</div>'+
+          '<div style="font-size:11px;color:var(--text-dim);margin-top:3px;">'+x.total_events+' eventos · '+x.delivered+' concluídas · '+x.failed+' falhadas · taxa de falha '+pct+'%</div>'+
+          '<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">Motivos: '+reasons+'</div></div>';
+      }).join('')+
+      '<p style="font-size:10.5px;color:var(--text-dim);margin-top:8px;">Amostra consultada: '+(data.sample_size||0)+' eventos. Estes dados servem para análise e não bloqueiam nem classificam automaticamente uma entrega.</p>';
+    }).catch(function(){ box.innerHTML='<p class="msg msg-error">Erro ao consultar histórico territorial.</p>'; });
+  });
 
   fetch(SUPABASE_URL + '/functions/v1/admin?action=dados_resumo', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }, body: '{}'
