@@ -1365,14 +1365,15 @@ window.AL_COUNTRY_RUNTIME = {
       if(!el) return;
       var field=el.closest('.field');
       var lab=field && field.querySelector('label');
-      if(lab) lab.textContent=lab.textContent.replace(/Bairro/g,label);
+      if(lab){ var nextLabel=lab.textContent.replace(/Bairro/g,label); if(lab.textContent!==nextLabel) lab.textContent=nextLabel; }
       Array.prototype.forEach.call(el.options,function(o){
-        o.textContent=o.textContent
+        var next=o.textContent
           .replace(/Escolhe um bairro/gi,'Escolhe '+article+' '+lower)
           .replace(/Novo bairro/gi,other+' '+lower)
           .replace(/Outro bairro/gi,other+' '+lower)
           .replace(/Bairro sem nome/gi,label+' sem nome')
           .replace(/A carregar bairros/gi,'A carregar '+plural.toLocaleLowerCase('pt-PT'));
+        if(o.textContent!==next) o.textContent=next;
       });
     });
     if(novo) novo.placeholder='Nome '+lower;
