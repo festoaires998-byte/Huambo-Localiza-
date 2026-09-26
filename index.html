@@ -526,6 +526,7 @@
           </select>
         </div>
         <button id="btn-save-favorite" class="btn btn-success-outline">🔖 Guardar como favorito</button>
+        <p class="msg msg-muted" style="font-size:11px;margin-top:4px;">Guardar como favorito é pessoal e não exige KYC nem aprovação.</p>
         <p id="save-msg" class="msg"></p>
       </div>
     </div>
@@ -3088,6 +3089,9 @@ document.getElementById('btn-scan-cancelar').addEventListener('click', stopScann
 document.getElementById('btn-save-favorite').addEventListener('click', function() {
   if (!session || !lastLocation) return;
   var saveMsg = document.getElementById('save-msg');
+  // Favoritar é uma ação pessoal: não exige KYC nem aprovação de registo.
+  // O fluxo de "Registar localização" continua sujeito ao processo próprio de KYC/revisão.
+
 
   if (!navigator.onLine) {
     queuePendingOp('save_favorite', {
