@@ -5,7 +5,7 @@
 // (ex.: 'v1' -> 'v2'). Sem isso, quem já tiver a app instalada fica preso
 // à versão antiga para sempre, porque o telemóvel nunca mais volta a
 // perguntar ao servidor se há algo novo.
-const CACHE_NAME = 'angola-localiza-v4';
+const CACHE_NAME = 'angola-localiza-v5';
 
 // Bibliotecas externas: mudam muito raramente, por isso podem ficar em
 // cache "à vontade" (cache-first) sem risco de ficares preso numa versão antiga.
@@ -51,33 +51,45 @@ self.addEventListener('activate', function (event) {
 });
 
 self.addEventListener('fetch', function (event) {
-  var url = event.request.url;
-  var ehBibliotecaExterna = BIBLIOTECAS_EXTERNAS.indexOf(url) > -1;
+  var request = event.request;
+  var url = new URL(request.url);
+  var ehGET = request.method === 'GET';
+  var ehMesmoOrigem = url.origin === self.location.origin;
+  var ehSupabase = url.hostname.endsWith('.supabase.co');
+  var ehBibliotecaExterna = BIBLIOTECAS_EXTERNAS.indexOf(request.url) > -1;
+
+  // Nunca colocar chamadas dinâmicas/API em cache.
+  // Isto inclui Supabase e qualquer POST/PUT/PATCH/DELETE.
+  if (!ehGET || ehSupabase) {
+    return;
+  }
 
   if (ehBibliotecaExterna) {
-    // Bibliotecas externas: usa o que está em cache, só vai à rede se não tiver
     event.respondWith(
-      caches.match(event.request).then(function (emCache) {
-        return emCache || fetch(event.request);
+      caches.match(request).then(function (emCache) {
+        return emCache || fetch(request);
       })
     );
     return;
   }
 
-  // Tudo o resto (o index.html, sobretudo): tenta sempre a rede primeiro,
-  // para nunca mostrares a alguém uma versão desatualizada da app por engano.
-  // Só usa o que está em cache quando mesmo não há rede nenhuma.
-  event.respondWith(
-    fetch(event.request)
-      .then(function (respostaDaRede) {
-        var copia = respostaDaRede.clone();
-        caches.open(CACHE_NAME).then(function (cache) { cache.put(event.request, copia); });
-        return respostaDaRede;
-      })
-      .catch(function () {
-        return caches.match(event.request).then(function (emCache) {
-          return emCache || caches.match('./index.html');
-        });
-      })
-  );
+  // Apenas recursos estáticos do próprio site usam network-first.
+  // Assim, novas versões chegam da rede sem congelar comandos ou dados.
+  if (ehMesmoOrigem) {
+    event.respondWith(
+      fetch(request)
+        .then(function (respostaDaRede) {
+          var copia = respostaDaRede.clone();
+          caches.open(CACHE_NAME).then(function (cache) {
+            cache.put(request, copia);
+          }).catch(function () {});
+          return respostaDaRede;
+        })
+        .catch(function () {
+          return caches.match(request).then(function (emCache) {
+            return emCache || caches.match('./index.html');
+          });
+        })
+    );
+  }
 });
