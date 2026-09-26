@@ -1352,6 +1352,8 @@ var session = null;
 var alRealtimeClient = null;
 var realtimeDeliveryChannels = {};
 var deliveryTrackingWatches = {};
+var deliveryTrackingLastSent = {};
+var DELIVERY_TRACKING_MIN_INTERVAL_MS = 5000;
 
 function initRealtimeClient() {
   if (alRealtimeClient || !window.supabase || !window.supabase.createClient) return;
@@ -1373,6 +1375,7 @@ function stopDeliveryRealtime(deliveryId) {
     try { alRealtimeClient.removeChannel(ch); } catch (e) {}
   }
   delete realtimeDeliveryChannels[deliveryId];
+  delete deliveryTrackingLastSent[deliveryId];
 }
 
 function stopAllDeliveryRealtime() {
@@ -1380,6 +1383,7 @@ function stopAllDeliveryRealtime() {
   Object.keys(deliveryTrackingWatches).forEach(function(id) {
     try { navigator.geolocation.clearWatch(deliveryTrackingWatches[id]); } catch (e) {}
     delete deliveryTrackingWatches[id];
+    delete deliveryTrackingLastSent[id];
   });
 }
 
@@ -1434,6 +1438,9 @@ function toggleDeliveryLocationSharing(deliveryId, button) {
   button.textContent = 'A ligar GPS...';
   var myId = getCurrentUserId();
   var watchId = navigator.geolocation.watchPosition(function(pos) {
+    var now = Date.now();
+    if (deliveryTrackingLastSent[deliveryId] && now - deliveryTrackingLastSent[deliveryId] < DELIVERY_TRACKING_MIN_INTERVAL_MS) return;
+    deliveryTrackingLastSent[deliveryId] = now;
     fetch(SUPABASE_URL + '/rest/v1/delivery_tracking?on_conflict=delivery_id', {
       method: 'POST',
       headers: {
@@ -5280,7 +5287,7 @@ function renderMinhasEntregas() {
         actions += '<button data-id="' + d.id + '" data-status="ASSIGNED" class="entrega-status-btn btn btn-secondary btn-sm">🔁 Reagendar tentativa</button>';
       }
     }
-    if (myRoles.indexOf('estafeta') > -1 && ['DELIVERED','FAILED','CANCELLED'].indexOf(d.status) === -1) {
+    if (myRoles.indexOf('estafeta') > -1 && d.assigned_driver === getCurrentUserId() && ['DELIVERED','FAILED','CANCELLED'].indexOf(d.status) === -1) {
       actions += '<button data-id="' + d.id + '" class="tracking-share-btn btn btn-secondary btn-sm">📡 Partilhar localização</button>';
     }
     if ((!souVisaoGlobal || myRoles.indexOf('super_admin') > -1) && d.status !== 'CANCELLED') {
