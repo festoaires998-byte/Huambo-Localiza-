@@ -2891,6 +2891,22 @@ function loadMarketplace() {
           (options ? '<select class="input marketplace-assign-select" style="height:40px;margin-bottom:8px;">'+options+'</select><button data-delivery="'+d.id+'" class="marketplace-assign-btn btn btn-success-solid btn-sm">Atribuir estafeta</button>' : '<p class="msg msg-muted">Sem estafetas disponíveis para atribuição.</p>');
         list.appendChild(div);
       });
+      document.querySelectorAll('.marketplace-assign-btn').forEach(function(b){
+        var row=b.parentElement, select=row.querySelector('.marketplace-assign-select');
+        fetch(SUPABASE_URL + '/functions/v1/admin?action=dispatch_context', {
+          method:'POST', headers:{'Content-Type':'application/json','apikey':ANON_KEY,'Authorization':'Bearer '+session.access_token},
+          body:JSON.stringify({delivery_id:b.dataset.delivery})
+        }).then(function(r){return r.json();}).then(function(ctx){
+          if(!ctx || !ctx.drivers || !select) return;
+          Array.prototype.slice.call(select.options).forEach(function(opt){
+            var s=ctx.drivers[opt.value];
+            if(!s) return;
+            var rate=s.events ? Math.round((s.delivered/s.events)*100) : null;
+            opt.textContent=(opt.textContent||opt.value)+' · '+s.events+' reg.'+(rate!=null?' · '+rate+'% concluídas':'');
+          });
+        }).catch(function(){ /* contexto é informativo; falha não impede atribuição */ });
+      });
+
       estafetas.forEach(function(e){
         var div=document.createElement('div'); div.className='list-item';
         div.innerHTML='<div class="value-plain">🧑‍✈️ '+(e.email||'Estafeta')+'</div><div style="font-size:11px;color:var(--text-dim);margin-top:3px;">Estado gerido pelo sistema de identidade e permissões.</div>';
