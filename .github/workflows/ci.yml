@@ -1,0 +1,45 @@
+name: CI Web
+
+on:
+  push:
+    branches: [main, country-runtime-ui]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate HTML and inline JavaScript
+        run: |
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          import re, subprocess, tempfile
+
+          html = Path("index.html").read_text(encoding="utf-8")
+          parser = HTMLParser()
+          parser.feed(html)
+          parser.close()
+
+          required = [
+              'registar-local-bairro',
+              'campo-neighborhood-select',
+              'search-input',
+              'registar-local-bairro-novo',
+          ]
+          missing = [x for x in required if f'id="{x}"' not in html]
+          if missing:
+              raise SystemExit(f"Missing required element(s): {missing}")
+
+          scripts = re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>', html, flags=re.I|re.S)
+          for i, script in enumerate(scripts, 1):
+              if not script.strip():
+                  continue
+              with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
+                  f.write(script)
+                  path = f.name
+              subprocess.run(["node", "--check", path], check=True)
+          print(f"Validated {len(scripts)} inline script block(s).")
+          PY
