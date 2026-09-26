@@ -3003,6 +3003,25 @@ function loadMarketplace() {
   }
 }
 
+// Sincronização de interface: ao voltar para a APP/site ou recuperar a ligação,
+// atualiza os módulos operacionais sem apagar sessão nem dados locais.
+var alLastUiRefresh = 0;
+function alRefreshOperationalViews(force) {
+  if (!session || !navigator.onLine) return;
+  var now = Date.now();
+  if (!force && now - alLastUiRefresh < 4000) return;
+  alLastUiRefresh = now;
+  var visible = function(id) {
+    var el=document.getElementById(id); return el && el.offsetParent !== null;
+  };
+  if (visible('marketplace-unassigned-list')) loadMarketplace();
+  if (visible('minhas-entregas-list')) loadMinhasEntregas();
+  if (visible('admin-panel')) loadAdmin();
+}
+document.addEventListener('visibilitychange', function(){ if (!document.hidden) alRefreshOperationalViews(true); });
+window.addEventListener('focus', function(){ alRefreshOperationalViews(true); });
+window.addEventListener('online', function(){ setTimeout(function(){ alRefreshOperationalViews(true); }, 600); });
+
 document.getElementById('btn-marketplace-minhas-entregas').addEventListener('click', function(){
   var btn=document.getElementById('tab-btn-minhas-entregas');
   if(btn){ btn.click(); }
