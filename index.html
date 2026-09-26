@@ -209,7 +209,7 @@
   .panel { display: none; padding: var(--sp-4) var(--sp-4) var(--sp-5); }
   .panel.visible { display: block; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 </style>
-  <meta name="al-build-id" content="20260926-633536d">
+  <meta name="al-build-id" content="20260926-101500">
 </head>
 <body>
 <script>
@@ -6645,9 +6645,14 @@ document.getElementById('btn-quadra-fechar').addEventListener('click', function(
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
-      navigator.serviceWorker.register('sw.js?v=20260926-5')
+      navigator.serviceWorker.register('sw.js?v=20260926-6')
         .then(function(reg) { reg.update(); console.log('Motor offline (PWA) ativado com sucesso!'); })
         .catch(function(err) { console.error('Erro ao ativar o PWA:', err); });
+    });
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+      if (window.__alSwReloaded) return;
+      window.__alSwReloaded = true;
+      window.location.reload();
     });
   }
 </script>
@@ -6658,7 +6663,7 @@ document.getElementById('btn-quadra-fechar').addEventListener('click', function(
   var localBuild=build.getAttribute('content');
   var key='al-last-build';
   try { localStorage.setItem(key,localBuild); } catch(e){}
-  var versionUrl='https://raw.githubusercontent.com/festoaires998-byte/Huambo-Localiza-/main/version.json?t='+Date.now();
+  var versionUrl='./version.json?t='+Date.now();
   fetch(versionUrl,{cache:'no-store'}).then(function(r){return r.ok?r.json():null;}).then(function(v){
     if(!v || !v.build || v.build===localBuild) return;
     var next=location.href.split('#')[0];
