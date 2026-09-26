@@ -209,7 +209,7 @@
   .panel { display: none; padding: var(--sp-4) var(--sp-4) var(--sp-5); }
   .panel.visible { display: block; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 </style>
-  <meta name="al-build-id" content="20260926-sync-02">
+  <meta name="al-build-id" content="20260926-101500">
 </head>
 <body>
 <script>
@@ -6679,31 +6679,22 @@ document.getElementById('btn-quadra-fechar').addEventListener('click', function(
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
-      navigator.serviceWorker.register('sw.js?v=20260926-6')
+      navigator.serviceWorker.register('sw.js?v=20260926-7')
         .then(function(reg) { reg.update(); console.log('Motor offline (PWA) ativado com sucesso!'); })
         .catch(function(err) { console.error('Erro ao ativar o PWA:', err); });
     });
-    navigator.serviceWorker.addEventListener('controllerchange', function() {
-      if (window.__alSwReloaded) return;
-      window.__alSwReloaded = true;
-      window.location.reload();
-    });
+    // Não recarregar automaticamente quando o Service Worker muda de controlador.
+    // O reload automático interrompia formulários e podia criar ciclos de atualização.
   }
 </script>
 <script>
 (function(){
+  // Atualização nunca deve recarregar a página automaticamente.
+  // A versão é informativa; o utilizador decide quando atualizar.
   var build=document.querySelector('meta[name="al-build-id"]');
-  if(!build) return;
-  var localBuild=build.getAttribute('content');
-  var key='al-last-build';
-  try { localStorage.setItem(key,localBuild); } catch(e){}
-  var versionUrl='./version.json?t='+Date.now();
-  fetch(versionUrl,{cache:'no-store'}).then(function(r){return r.ok?r.json():null;}).then(function(v){
-    if(!v || !v.build || v.build===localBuild) return;
-    var next=location.href.split('#')[0];
-    next+=(next.indexOf('?')>=0?'&':'?')+'al_build='+encodeURIComponent(v.build);
-    location.replace(next+location.hash);
-  }).catch(function(){});
+  if(build) {
+    try { localStorage.setItem('al-last-build', build.getAttribute('content') || ''); } catch(e){}
+  }
 })();
 </script>
 
