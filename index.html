@@ -2654,6 +2654,7 @@ document.getElementById('btn-logout').addEventListener('click', function() {
 });
 
 function resetTransientFormsOnTabChange() {
+  deixaAquiSelecionado = null;
   stopAllCameraStreams();
   var scanner = document.getElementById('scanner-box'); if (scanner) scanner.style.display = 'none';
   var regForm = document.getElementById('registar-local-form');
@@ -3081,6 +3082,7 @@ var entregaDestinoAtual = null;
 var entregaOrigemAtual = { source_type: 'gps' };
 var entregaQrStream = null;
 var entregaQrTarget = null;
+var deixaAquiSelecionado = null;
 
 function entregaLabelPonto(ponto) {
   if (!ponto) return 'Ponto não definido';
@@ -3133,10 +3135,28 @@ function deixaAquiEscapar(v) {
   });
 }
 
+function deixaAquiSelecionar(ponto, card) {
+  deixaAquiSelecionado = ponto || null;
+  document.querySelectorAll('.deixa-aqui-select-btn').forEach(function(b){
+    b.textContent = 'Selecionar';
+    b.disabled = false;
+  });
+  if(card) {
+    var btn=card.querySelector('.deixa-aqui-select-btn');
+    if(btn){ btn.textContent='✓ Selecionado'; btn.disabled=false; }
+  }
+  var msg=document.getElementById('deixa-aqui-msg');
+  if(msg && ponto) {
+    msg.className='msg msg-success';
+    msg.textContent='Deixa Aqui selecionado: '+ponto.name+'. A entrega normal continuará a usar o destino original.';
+  }
+}
+
 function deixaAquiRender(rows) {
   var list=document.getElementById('deixa-aqui-list');
   if(!list)return;
   list.innerHTML='';
+  deixaAquiSelecionado=null;
   (rows||[]).forEach(function(p){
     var card=document.createElement('div');
     card.className='list-item';
@@ -3144,8 +3164,9 @@ function deixaAquiRender(rows) {
       '<div><div class="value-md">'+deixaAquiEscapar(p.name)+'</div>' +
       '<div style="font-size:11px;color:var(--text-dim);margin-top:3px;">'+deixaAquiEscapar(p.point_type||'Ponto')+' · '+Math.round(Number(p.distance_meters||0))+' m</div>' +
       (p.instructions?'<div style="font-size:11px;color:var(--text-dim);margin-top:3px;">'+deixaAquiEscapar(p.instructions)+'</div>':'')+
-      '</div><span class="badge">Ativo</span></div>';
+      '</div><button type="button" class="btn btn-secondary btn-sm deixa-aqui-select-btn">Selecionar</button></div>';
     list.appendChild(card);
+    card.querySelector('.deixa-aqui-select-btn').addEventListener('click',function(){deixaAquiSelecionar(p,card);});
   });
 }
 
@@ -3524,7 +3545,8 @@ document.getElementById('btn-criar-entrega').addEventListener('click',function()
       zone_code_hint:zoneCode,is_urgent:document.getElementById('entrega-urgente-check').checked,
       // Novo contrato de pontos: o backend deve tratar estes campos como snapshot da entrega.
       pickup_point: entregaOrigemAtual,
-      destination_point: entregaDestinoAtual
+      destination_point: entregaDestinoAtual,
+      deixa_aqui_point_id: deixaAquiSelecionado ? deixaAquiSelecionado.id : null
     },entregaPontoPayload('origin',entregaOrigemAtual),entregaPontoPayload('destination',entregaDestinoAtual));
     // Compatibilidade com a API antiga.
     payload.origin_latitude=entregaOrigemAtual.latitude||null; payload.origin_longitude=entregaOrigemAtual.longitude||null;
@@ -3550,7 +3572,13 @@ document.getElementById('btn-criar-entrega').addEventListener('click',function()
           return;
         }
         var createdPayload = Object.assign({}, payload, delivery);
-        mostrarEntregaCriadaLocal(createdPayload, nome, false);
+        var saveDeixaAqui = deixaAquiSelecionado && delivery.id ? fetch(SUPABASE_URL+'/rest/v1/rpc/select_deixa_aqui_for_delivery',{
+          method:'POST',
+          headers:{'Content-Type':'application/json','apikey':ANON_KEY,'Authorization':'Bearer '+session.access_token},
+          body:JSON.stringify({p_delivery_id:delivery.id,p_point_id:deixaAquiSelecionado.id})
+        }).then(function(r){if(!r.ok)return r.json().then(function(e){throw new Error(e.message||'Não foi possível associar o ponto.');});return r.json();}).catch(function(){return null;}) : Promise.resolve(null);
+        saveDeixaAqui.then(function(){mostrarEntregaCriadaLocal(createdPayload, nome, false);});
+
       }).catch(function(){
         try { queuePendingOp('create_delivery',payload); }
         catch (e) { msg.className='msg msg-error'; msg.textContent='Não foi possível guardar a entrega. Tenta novamente.'; releaseDeliverySubmitLock(); return; }
