@@ -1606,8 +1606,26 @@ window.AL_COUNTRY_RUNTIME = {
   }
   window.AL_COUNTRY_RUNTIME.ready=carregar();
   if(window.MutationObserver){
-    var observar=function(id){ var el=document.getElementById(id); if(!el)return; new MutationObserver(aplicar).observe(el,{childList:true,subtree:true}); };
-    setTimeout(function(){ observar('registar-local-bairro'); observar('campo-neighborhood-select'); aplicar(); },0);
+    var aplicarAgendado=false;
+    var observerGuard=false;
+    var aplicarSeguro=function(){
+      if(observerGuard) return;
+      observerGuard=true;
+      try { aplicar(); } finally {
+        observerGuard=false;
+        aplicarAgendado=false;
+      }
+    };
+    var observar=function(id){
+      var el=document.getElementById(id);
+      if(!el)return;
+      new MutationObserver(function(){
+        if(observerGuard || aplicarAgendado) return;
+        aplicarAgendado=true;
+        setTimeout(aplicarSeguro,0);
+      }).observe(el,{childList:true});
+    };
+    setTimeout(function(){ observar('registar-local-bairro'); observar('campo-neighborhood-select'); aplicarSeguro(); },0);
   }
 })();
 
