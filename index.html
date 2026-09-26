@@ -3067,9 +3067,13 @@ function alRefreshOperationalViews(force) {
   if (visible('minhas-entregas-list')) loadMinhasEntregas();
   if (visible('admin-panel')) loadAdmin();
 }
-document.addEventListener('visibilitychange', function(){ if (!document.hidden) alRefreshOperationalViews(true); });
-window.addEventListener('focus', function(){ alRefreshOperationalViews(true); });
-window.addEventListener('online', function(){ setTimeout(function(){ alRefreshOperationalViews(true); }, 600); });
+// Recuperar dados apenas quando a ligação voltar.
+window.addEventListener('online', function(){
+  if (!session) return;
+  setTimeout(function(){ alRefreshOperationalViews(false); }, 1000);
+});
+// Não atualizar listas ao ganhar foco/visibilidade: isso interrompia interações
+// quando o navegador/teclado mudava o foco da página.
 // Não fazer refresh periódico da interface.
 // Listas operacionais são atualizadas por Realtime e por ações explícitas do utilizador.
 // Isto evita reconstruir DOM enquanto o utilizador preenche formulários ou toca nos controlos.
