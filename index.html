@@ -213,6 +213,36 @@
 </head>
 <body>
 <script>
+var APP_BUILD_ID = "20260926-rt-sync-01";
+(function verificarVersaoPublicada(){
+  var KEY='al_build_reload_at';
+  function check(){
+    try{
+      var u=new URL(window.location.href);
+      u.searchParams.set('al-build-check',Date.now().toString());
+      fetch(u.toString(),{cache:'no-store',credentials:'same-origin'}).then(function(r){
+        if(!r.ok)return r.text().then(function(){throw new Error('version-check')});
+        return r.text();
+      }).then(function(html){
+        var m=html.match(/var APP_BUILD_ID\s*=\s*["']([^"']+)["']/);
+        if(!m||m[1]===APP_BUILD_ID)return;
+        var now=Date.now(),last=Number(sessionStorage.getItem(KEY)||0);
+        if(now-last<60000)return;
+        sessionStorage.setItem(KEY,String(now));
+        var n=document.createElement('div');
+        n.textContent='Nova versão disponível. A atualizar…';
+        n.style='position:fixed;z-index:99999;left:12px;right:12px;bottom:12px;padding:12px;border-radius:10px;background:#111;color:#fff;text-align:center;font:600 13px system-ui';
+        document.body.appendChild(n);
+        setTimeout(function(){window.location.reload();},500);
+      }).catch(function(){});
+    }catch(e){}
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(check,8000);});
+  else setTimeout(check,8000);
+  document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')setTimeout(check,1000);});
+})();
+</script>
+<script>
   if (localStorage.getItem('al-theme') === 'light') { document.body.setAttribute('data-theme', 'light'); }
 </script>
 
