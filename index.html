@@ -1344,10 +1344,124 @@ Erros: 400 validação · 401 chave inválida · 403 escopo insuficiente · 404 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.6/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js"></script>
 <script>
 var SUPABASE_URL = "https://qntbknegicaghnbnghyw.supabase.co";
 var ANON_KEY = "sb_publishable_9RypatlYEYRmx8kRnyNS-A_ZRLMgl_a";
 var session = null;
+var alRealtimeClient = null;
+var realtimeDeliveryChannels = {};
+var deliveryTrackingWatches = {};
+
+function initRealtimeClient() {
+  if (alRealtimeClient || !window.supabase || !window.supabase.createClient) return;
+  alRealtimeClient = window.supabase.createClient(SUPABASE_URL, ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+  });
+}
+
+function setRealtimeAuth() {
+  initRealtimeClient();
+  if (alRealtimeClient && session && session.access_token) {
+    try { alRealtimeClient.realtime.setAuth(session.access_token); } catch (e) {}
+  }
+}
+
+function stopDeliveryRealtime(deliveryId) {
+  var ch = realtimeDeliveryChannels[deliveryId];
+  if (ch && alRealtimeClient) {
+    try { alRealtimeClient.removeChannel(ch); } catch (e) {}
+  }
+  delete realtimeDeliveryChannels[deliveryId];
+}
+
+function stopAllDeliveryRealtime() {
+  Object.keys(realtimeDeliveryChannels).forEach(stopDeliveryRealtime);
+  Object.keys(deliveryTrackingWatches).forEach(function(id) {
+    try { navigator.geolocation.clearWatch(deliveryTrackingWatches[id]); } catch (e) {}
+    delete deliveryTrackingWatches[id];
+  });
+}
+
+function updateLiveDeliveryRow(deliveryId, patch) {
+  var row = minhasEntregasCache.find(function(d) { return d.id === deliveryId; });
+  if (row) Object.keys(patch || {}).forEach(function(k) { row[k] = patch[k]; });
+  var el = document.querySelector('[data-live-delivery-id="' + deliveryId + '"]');
+  if (!el) return;
+  if (patch.status) {
+    var statusEl = el.querySelector('.live-status');
+    if (statusEl) statusEl.textContent = (STATUS_LABEL[patch.status] || patch.status);
+  }
+  if (patch.trackingUpdatedAt) {
+    var locEl = el.querySelector('.live-location');
+    if (locEl) locEl.textContent = '📡 Localização atualizada ' + new Date(patch.trackingUpdatedAt).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'});
+  }
+}
+
+function subscribeDeliveryRealtime(deliveryId) {
+  if (!deliveryId || !session) return;
+  initRealtimeClient();
+  setRealtimeAuth();
+  if (!alRealtimeClient || realtimeDeliveryChannels[deliveryId]) return;
+  var channel = alRealtimeClient.channel('delivery-live:' + deliveryId)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'deliveries', filter: 'id=eq.' + deliveryId }, function(payload) {
+      var n = payload.new || {};
+      updateLiveDeliveryRow(deliveryId, { status: n.status, updated_at: n.updated_at });
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'delivery_tracking', filter: 'delivery_id=eq.' + deliveryId }, function(payload) {
+      var n = payload.new || {};
+      updateLiveDeliveryRow(deliveryId, { trackingUpdatedAt: n.updated_at });
+    })
+    .subscribe();
+  realtimeDeliveryChannels[deliveryId] = channel;
+}
+
+function toggleDeliveryLocationSharing(deliveryId, button) {
+  if (!session || !navigator.geolocation) {
+    if (button) button.textContent = 'GPS indisponível';
+    return;
+  }
+  if (deliveryTrackingWatches[deliveryId] != null) {
+    navigator.geolocation.clearWatch(deliveryTrackingWatches[deliveryId]);
+    delete deliveryTrackingWatches[deliveryId];
+    button.textContent = '📡 Partilhar localização';
+    return;
+  }
+  button.disabled = true;
+  button.textContent = 'A ligar GPS...';
+  var myId = getCurrentUserId();
+  var watchId = navigator.geolocation.watchPosition(function(pos) {
+    fetch(SUPABASE_URL + '/rest/v1/delivery_tracking?on_conflict=delivery_id', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': ANON_KEY,
+        'Authorization': 'Bearer ' + session.access_token,
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
+      },
+      body: JSON.stringify({
+        delivery_id: deliveryId,
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+        accuracy_meters: pos.coords.accuracy,
+        updated_by: myId
+      })
+    }).then(function(r) {
+      if (!r.ok) throw new Error('tracking');
+      button.disabled = false;
+      button.textContent = '⏹️ Parar localização';
+      updateLiveDeliveryRow(deliveryId, { trackingUpdatedAt: new Date().toISOString() });
+    }).catch(function() {
+      button.disabled = false;
+      button.textContent = '⚠️ Tentar localização';
+    });
+  }, function() {
+    button.disabled = false;
+    button.textContent = '⚠️ Autorizar localização';
+  }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
+  deliveryTrackingWatches[deliveryId] = watchId;
+}
+
 
 // Câmara global: qualquer stream aberta é registada para poder ser encerrada
 // imediatamente quando o utilizador muda de separador.
@@ -2644,6 +2758,7 @@ document.getElementById('btn-apagar-historico').addEventListener('click', functi
 });
 
 document.getElementById('btn-logout').addEventListener('click', function() {
+  stopAllDeliveryRealtime();
   limparSessaoLocal();
   session = null; lastAddressId = null; isAdmin = false; myRoles = [];
   document.getElementById('tab-btn-admin').style.display = 'none';
@@ -4663,6 +4778,7 @@ function renderAuditLog() {
   logs.slice(0, 15).forEach(function(log) {
     var div = document.createElement('div');
     div.className = 'list-item';
+    div.dataset.liveDeliveryId = d.id;
     var when = new Date(log.created_at).toLocaleString('pt-PT');
     div.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">' +
@@ -5161,6 +5277,9 @@ function renderMinhasEntregas() {
         actions += '<button data-id="' + d.id + '" data-status="ASSIGNED" class="entrega-status-btn btn btn-secondary btn-sm">🔁 Reagendar tentativa</button>';
       }
     }
+    if (myRoles.indexOf('estafeta') > -1 && ['DELIVERED','FAILED','CANCELLED'].indexOf(d.status) === -1) {
+      actions += '<button data-id="' + d.id + '" class="tracking-share-btn btn btn-secondary btn-sm">📡 Partilhar localização</button>';
+    }
     if ((!souVisaoGlobal || myRoles.indexOf('super_admin') > -1) && d.status !== 'CANCELLED') {
       actions += '<button data-id="' + d.id + '" data-titulo="Entrega #' + d.tracking_code + '" class="entrega-chat-btn btn btn-secondary btn-sm">💬 Chat</button>';
     }
@@ -5187,7 +5306,8 @@ function renderMinhasEntregas() {
           (addr.streets ? '<div style="font-size:11px;color:var(--text-dim);margin-top:2px;">' + addr.streets.name + (addr.quadras ? ' · Quadra ' + addr.quadras.code : '') + (addr.house_number ? ' · nº ' + addr.house_number : '') + '</div>' : '') +
           (addr.reference ? '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">📍 ' + addr.reference + '</div>' : '') +
           (d.instructions ? '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">📝 ' + d.instructions + '</div>' : '') +
-          '<div style="font-size:11.5px;color:var(--text-dim);margin-top:4px;">' + (STATUS_LABEL[d.status] || d.status) + '</div>' +
+          '<div class="live-status" style="font-size:11.5px;color:var(--text-dim);margin-top:4px;">' + (STATUS_LABEL[d.status] || d.status) + '</div>' +
+          '<div class="live-location" style="font-size:10.5px;color:var(--verified);margin-top:3px;">📡 Tracking em tempo real ativo</div>' +
         '</div>' +
         '<div style="display:flex;gap:6px;">' +
           (whatsappHref ? '<a href="' + whatsappHref + '" target="_blank" class="icon-btn" aria-label="WhatsApp" style="text-decoration:none;">💬</a>' : '') +
@@ -5196,6 +5316,11 @@ function renderMinhasEntregas() {
       '</div>' +
       (actions ? '<div class="btn-row" style="margin-top:10px;">' + actions + '</div>' : '');
     list.appendChild(div);
+    subscribeDeliveryRealtime(d.id);
+  });
+
+  document.querySelectorAll('.tracking-share-btn').forEach(function(b) {
+    b.addEventListener('click', function() { toggleDeliveryLocationSharing(b.dataset.id, b); });
   });
 
   document.querySelectorAll('.entrega-urgente-btn').forEach(function(b) {
