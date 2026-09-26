@@ -1847,7 +1847,7 @@ function fecharChat() {
 document.getElementById('btn-chat-fechar').addEventListener('click', fecharChat);
 
 function carregarChat() {
-  if (!chatAtual) return;
+  if (!chatAtual || document.hidden) return;
   fetch(SUPABASE_URL + '/functions/v1/chat?action=list', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
     body: JSON.stringify(chatAtual)
