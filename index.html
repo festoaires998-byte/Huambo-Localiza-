@@ -1351,6 +1351,7 @@ var ANON_KEY = "sb_publishable_9RypatlYEYRmx8kRnyNS-A_ZRLMgl_a";
 var session = null;
 var alRealtimeClient = null;
 var realtimeDeliveryChannels = {};
+var realtimeDeliveryRetryTimers = {};
 var deliveryTrackingWatches = {};
 var deliveryTrackingLastSent = {};
 var DELIVERY_TRACKING_MIN_INTERVAL_MS = 5000;
@@ -1375,6 +1376,10 @@ function stopDeliveryRealtime(deliveryId) {
     try { alRealtimeClient.removeChannel(ch); } catch (e) {}
   }
   delete realtimeDeliveryChannels[deliveryId];
+  if (realtimeDeliveryRetryTimers[deliveryId]) {
+    clearTimeout(realtimeDeliveryRetryTimers[deliveryId]);
+    delete realtimeDeliveryRetryTimers[deliveryId];
+  }
   delete deliveryTrackingLastSent[deliveryId];
 }
 
@@ -1419,7 +1424,21 @@ function subscribeDeliveryRealtime(deliveryId) {
       var n = payload.new || {};
       updateLiveDeliveryRow(deliveryId, { trackingUpdatedAt: n.updated_at });
     })
-    .subscribe();
+    .subscribe(function(status) {
+      var el = document.querySelector('[data-live-delivery-id="' + deliveryId + '"] .live-location');
+      if (status === 'SUBSCRIBED') {
+        if (el) el.textContent = '📡 Tracking Realtime ligado';
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        if (el) el.textContent = '⚠️ Tracking temporariamente indisponível — a tentar reconectar';
+        delete realtimeDeliveryChannels[deliveryId];
+        if (!realtimeDeliveryRetryTimers[deliveryId] && session) {
+          realtimeDeliveryRetryTimers[deliveryId] = setTimeout(function() {
+            delete realtimeDeliveryRetryTimers[deliveryId];
+            subscribeDeliveryRealtime(deliveryId);
+          }, 3000);
+        }
+      }
+    });
   realtimeDeliveryChannels[deliveryId] = channel;
 }
 
