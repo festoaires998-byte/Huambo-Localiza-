@@ -1396,6 +1396,9 @@ function updateLiveDeliveryRow(deliveryId, patch) {
     var locEl = el.querySelector('.live-location');
     if (locEl) locEl.textContent = '📡 Localização atualizada ' + new Date(patch.trackingUpdatedAt).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'});
   }
+  if (patch.status && ['DELIVERED','FAILED','CANCELLED'].indexOf(patch.status) > -1) {
+    stopDeliveryRealtime(deliveryId);
+  }
 }
 
 function subscribeDeliveryRealtime(deliveryId) {
@@ -5307,7 +5310,7 @@ function renderMinhasEntregas() {
           (addr.reference ? '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">📍 ' + addr.reference + '</div>' : '') +
           (d.instructions ? '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">📝 ' + d.instructions + '</div>' : '') +
           '<div class="live-status" style="font-size:11.5px;color:var(--text-dim);margin-top:4px;">' + (STATUS_LABEL[d.status] || d.status) + '</div>' +
-          '<div class="live-location" style="font-size:10.5px;color:var(--verified);margin-top:3px;">📡 Tracking em tempo real ativo</div>' +
+          '<div class="live-location" style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">📡 Aguardando localização do estafeta</div>' +
         '</div>' +
         '<div style="display:flex;gap:6px;">' +
           (whatsappHref ? '<a href="' + whatsappHref + '" target="_blank" class="icon-btn" aria-label="WhatsApp" style="text-decoration:none;">💬</a>' : '') +
