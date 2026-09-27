@@ -6335,10 +6335,16 @@ function campoDoSubmit() {
     return;
   }
 
-  fetch(SUPABASE_URL + '/functions/v1/field-service?action=submit', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
-    body: JSON.stringify(payload)
+  garantirChaveAssinaturaRegistada().then(function(registo) {
+    if (!registo || !registo.keyPair || !registo.registada) throw new Error('DEVICE_REGISTRATION_FAILED');
+    return window.crypto.subtle.exportKey('jwk', registo.keyPair.publicKey).then(function(jwk) {
+      payload.public_key_jwk = jwk;
+      return fetch(SUPABASE_URL + '/functions/v1/field-service?action=submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+        body: JSON.stringify(payload)
+      });
+    });
   }).then(function(r) { return r.json(); }).then(function(data) {
     if (data.error) { msg.className = 'msg msg-error'; msg.textContent = data.error; return; }
     msg.textContent = '';
