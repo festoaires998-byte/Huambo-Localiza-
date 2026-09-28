@@ -651,6 +651,31 @@ var APP_BUILD_ID = "20260926-101500";
           <div id="entrega-preco-preview-linha" class="value-plain"></div>
         </div>
 
+        <div class="field">
+          <label>📦 Carga</label>
+          <select id="entrega-carga-tipo" class="input">
+            <option value="Encomenda">Encomenda</option><option value="Documentos">Documentos</option>
+            <option value="Alimentos">Alimentos</option><option value="Frágil">Frágil</option>
+            <option value="Mobiliário">Mobiliário</option><option value="Outro">Outro</option>
+          </select>
+          <input id="entrega-carga-descricao" class="input" type="text" placeholder="Descrição da carga (opcional)" style="margin-top:6px;" />
+          <input id="entrega-carga-quantidade" class="input" type="number" min="1" step="1" placeholder="Quantidade" style="margin-top:6px;" />
+          <input id="entrega-carga-peso" class="input" type="number" min="0" step="0.001" placeholder="Peso total (kg)" style="margin-top:6px;" />
+          <div class="btn-row" style="margin-top:6px;">
+            <input id="entrega-carga-comprimento" class="input" type="number" min="0" step="0.01" placeholder="Comprimento cm" />
+            <input id="entrega-carga-largura" class="input" type="number" min="0" step="0.01" placeholder="Largura cm" />
+            <input id="entrega-carga-altura" class="input" type="number" min="0" step="0.01" placeholder="Altura cm" />
+          </div>
+          <input id="entrega-carga-valor" class="input" type="number" min="0" step="0.01" placeholder="Valor declarado (Kz, opcional)" style="margin-top:6px;" />
+        </div>
+        <div class="field">
+          <label>🚚 Veículo pretendido</label>
+          <select id="entrega-veiculo-tipo" class="input">
+            <option value="">Matching automático</option><option value="moto">Moto</option><option value="carro">Carro</option>
+            <option value="carrinha">Carrinha</option><option value="furgão">Furgão</option><option value="camião">Camião</option>
+          </select>
+          <input id="entrega-veiculo-capacidade" class="input" type="number" min="0" step="0.001" placeholder="Capacidade mínima pretendida (kg, opcional)" style="margin-top:6px;" />
+        </div>
         <div>
           <div class="field">
             <label>Nome de quem recebe *</label>
@@ -3748,6 +3773,16 @@ document.getElementById('btn-criar-entrega').addEventListener('click',function()
     var payload=Object.assign({
       address_id:entregaDestinoAtual.address_id&&String(entregaDestinoAtual.address_id).indexOf('CARD:')!==0?entregaDestinoAtual.address_id:null,
       recipient_name:nome,recipient_phone:contacto||null,instructions:nota||null,
+      cargo_type:document.getElementById('entrega-carga-tipo').value,
+      cargo_description:document.getElementById('entrega-carga-descricao').value.trim()||null,
+      cargo_quantity:document.getElementById('entrega-carga-quantidade').value ? Number(document.getElementById('entrega-carga-quantidade').value) : null,
+      cargo_weight_kg:document.getElementById('entrega-carga-peso').value ? Number(document.getElementById('entrega-carga-peso').value) : null,
+      cargo_length_cm:document.getElementById('entrega-carga-comprimento').value ? Number(document.getElementById('entrega-carga-comprimento').value) : null,
+      cargo_width_cm:document.getElementById('entrega-carga-largura').value ? Number(document.getElementById('entrega-carga-largura').value) : null,
+      cargo_height_cm:document.getElementById('entrega-carga-altura').value ? Number(document.getElementById('entrega-carga-altura').value) : null,
+      cargo_declared_value:document.getElementById('entrega-carga-valor').value ? Number(document.getElementById('entrega-carga-valor').value) : null,
+      requested_vehicle_type:document.getElementById('entrega-veiculo-tipo').value||null,
+      requested_vehicle_capacity_kg:document.getElementById('entrega-veiculo-capacidade').value ? Number(document.getElementById('entrega-veiculo-capacidade').value) : null,
       zone_code_hint:zoneCode,is_urgent:document.getElementById('entrega-urgente-check').checked,
       // Novo contrato de pontos: o backend deve tratar estes campos como snapshot da entrega.
       pickup_point: entregaOrigemAtual,
