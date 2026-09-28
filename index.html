@@ -2,7 +2,25 @@
 <html lang="pt">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<script>
+/* Web cache recovery: remove versões antigas do PWA antes do bootstrap. */
+(function(){
+  try{
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.getRegistrations().then(function(regs){
+        regs.forEach(function(reg){ reg.unregister().catch(function(){}); });
+      }).catch(function(){});
+    }
+    if('caches' in window){
+      caches.keys().then(function(keys){
+        keys.forEach(function(key){
+          if(/^angola-localiza-/i.test(key)) caches.delete(key).catch(function(){});
+        });
+      }).catch(function(){});
+    }
+  }catch(_){}
+})();
+</script><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Angola Localiza</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#D65B32">
@@ -209,7 +227,7 @@
   .panel { display: none; padding: var(--sp-4) var(--sp-4) var(--sp-5); }
   .panel.visible { display: block; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 </style>
-  <meta name="al-build-id" content="20260926-101500">
+  <meta name="al-build-id" content="20260928-230000">
 </head>
 <body>
 <script>
