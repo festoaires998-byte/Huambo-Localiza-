@@ -314,6 +314,13 @@ var APP_BUILD_ID = "20260926-101500";
         <label>Email</label>
         <input id="input-email" class="input" type="email" placeholder="nome@exemplo.com" />
       </div>
+      <div id="signup-country-field" class="field" style="display:none;">
+        <label>País</label>
+        <select id="input-country" class="input" aria-label="Selecionar país para criar a conta">
+          <option value="">A carregar países…</option>
+        </select>
+        <p class="msg msg-muted" style="margin-top:6px;">Escolhe o país onde a tua conta será criada.</p>
+      </div>
       <div class="field">
         <label>Palavra-passe</label>
         <input id="input-password" class="input" type="password" placeholder="mínimo 6 caracteres" />
@@ -1803,11 +1810,40 @@ function traduzirErroAuth(msg) {
   return msg || 'Erro ao processar.';
 }
 
+var inputCountry = document.getElementById('input-country');
+var signupCountryField = document.getElementById('signup-country-field');
+var signupCountriesLoaded = false;
+
+function carregarPaisesSignup() {
+  if (!inputCountry || signupCountriesLoaded) return;
+  fetch(SUPABASE_URL + '/rest/v1/country_configs?select=country_code,native_name,name&enabled=eq.true&order=native_name.asc', {
+    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY }
+  }).then(function(r) { return r.json(); }).then(function(rows) {
+    var countries = Array.isArray(rows) ? rows : [];
+    inputCountry.innerHTML = '<option value="">Seleciona o país</option>' +
+      countries.map(function(c) {
+        return '<option value="' + String(c.country_code).replace(/"/g, '&quot;') + '">' +
+          String(c.native_name || c.name || c.country_code).replace(/</g, '&lt;') + '</option>';
+      }).join('');
+    signupCountriesLoaded = true;
+  }).catch(function() {
+    inputCountry.innerHTML =
+      '<option value="">Seleciona o país</option>' +
+      '<option value="AO">Angola</option>' +
+      '<option value="CV">Cabo Verde</option>' +
+      '<option value="GW">Guiné-Bissau</option>' +
+      '<option value="MZ">Moçambique</option>' +
+      '<option value="ST">São Tomé e Príncipe</option>';
+  });
+}
+
 function setMode(m) {
   mode = m;
   tabSignin.classList.toggle('active', m === 'signin');
   tabSignup.classList.toggle('active', m === 'signup');
   btnSubmit.textContent = m === 'signin' ? 'Entrar' : 'Criar conta';
+  if (signupCountryField) signupCountryField.style.display = m === 'signup' ? 'block' : 'none';
+  if (m === 'signup') carregarPaisesSignup();
   authMsg.textContent = ''; authMsg.className = 'msg';
 }
 tabSignin.addEventListener('click', function() { setMode('signin'); });
@@ -2142,7 +2178,8 @@ function showApp() {
   document.getElementById('view-recuperar-password').classList.remove('visible');
   document.getElementById('view-nova-password').classList.remove('visible');
   document.getElementById('view-mfa-login').classList.remove('visible');
-  document.getElementById('session-label').textContent = 'ANGOLA · ' + session.email;
+  var sessionCountry = (session && session.country_code) || 'AO';
+  document.getElementById('session-label').textContent = String(sessionCountry).toUpperCase() + ' · ' + session.email;
 
   consumeJoinLinkIfPending().then(function() {
     return checkRoles();
@@ -2335,11 +2372,19 @@ function checkRoles() {
 btnSubmit.addEventListener('click', function() {
   var email = document.getElementById('input-email').value.trim();
   var password = document.getElementById('input-password').value;
+  var countryCode = inputCountry ? inputCountry.value : '';
+  if (mode === 'signup' && !countryCode) {
+    authMsg.className = 'msg msg-error';
+    authMsg.textContent = 'Seleciona o país para criar a conta.';
+    return;
+  }
   if (!email || !password) { authMsg.className = 'msg msg-error'; authMsg.textContent = 'Preenche o email e a palavra-passe.'; return; }
   btnSubmit.disabled = true; btnSubmit.textContent = 'A processar...';
   var redirectTo = encodeURIComponent(window.location.origin + window.location.pathname);
   var endpoint = mode === 'signin' ? SUPABASE_URL + '/auth/v1/token?grant_type=password' : SUPABASE_URL + '/auth/v1/signup?redirect_to=' + redirectTo;
-  fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY }, body: JSON.stringify({ email: email, password: password }) })
+  fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY }, body: JSON.stringify(mode === 'signup'
+      ? { email: email, password: password, data: { country_code: countryCode } }
+      : { email: email, password: password }) })
     .then(function(r) { return r.json().then(function(data) { return { status: r.status, data: data }; }); })
     .then(function(res) {
       btnSubmit.disabled = false; setMode(mode);
