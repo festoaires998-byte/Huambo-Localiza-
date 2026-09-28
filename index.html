@@ -740,6 +740,20 @@ var APP_BUILD_ID = "20260926-101500";
     </div>
     <div id="panel-minhas-entregas" class="panel">
       <p id="entregas-stats" class="value-plain" style="margin-bottom:4px;">Hoje: -- entregas · -- com prova · --% sucesso</p>
+      <div id="estafeta-disponiveis-box" class="card" style="display:none;margin-bottom:var(--sp-3);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <div>
+            <div class="label-caps">Pedidos disponíveis</div>
+            <div id="estafeta-disponiveis-estado" class="msg-muted" style="font-size:11.5px;">A verificar estado do estafeta…</div>
+          </div>
+          <button id="btn-estafeta-disponiveis-refresh" class="btn btn-secondary btn-sm">↻ Atualizar</button>
+        </div>
+        <div id="estafeta-disponiveis-list" class="stack-sm" style="margin-top:var(--sp-3);"></div>
+        <div id="estafeta-disponiveis-empty" class="empty-state" style="display:none;padding:10px 0;">
+          <div class="desc" style="margin:0;">Não há pedidos disponíveis neste momento.</div>
+        </div>
+        <p id="estafeta-disponiveis-msg" class="msg" style="margin-top:8px;"></p>
+      </div>
       <p id="entregas-offline-mini" class="msg msg-muted" style="margin:0 0 var(--sp-3);"></p>
       <button id="btn-limpar-historico-entregas" class="btn btn-danger-outline btn-sm" style="display:none;margin-bottom:var(--sp-3);">🗑️ Limpar histórico de entregas (super admin)</button>
       <button id="btn-sugerir-ordem" class="btn btn-secondary btn-sm" style="display:none;margin-bottom:var(--sp-3);">🧭 Sugerir ordem das entregas</button>
@@ -2958,6 +2972,7 @@ function alRefreshOperationalViews(force) {
     var el=document.getElementById(id); return el && el.offsetParent !== null;
   };
   if (visible('minhas-entregas-list')) loadMinhasEntregas();
+  if (visible('estafeta-disponiveis-box')) loadPedidosDisponiveisEstafeta();
   if (visible('admin-panel')) loadAdmin();
 }
 // Recuperar dados apenas quando a ligação voltar.
@@ -5303,6 +5318,80 @@ document.querySelectorAll('.entregas-filter-btn').forEach(function(b) {
   });
 });
 document.getElementById('minhas-entregas-search').addEventListener('input', renderMinhasEntregas);
+
+function loadPedidosDisponiveisEstafeta() {
+  var box = document.getElementById('estafeta-disponiveis-box');
+  if (!box || !session || myRoles.indexOf('estafeta') === -1) return;
+  box.style.display = 'block';
+  var list = document.getElementById('estafeta-disponiveis-list');
+  var empty = document.getElementById('estafeta-disponiveis-empty');
+  var estado = document.getElementById('estafeta-disponiveis-estado');
+  var msg = document.getElementById('estafeta-disponiveis-msg');
+  list.innerHTML = '<p class="msg msg-muted">A procurar pedidos…</p>';
+  empty.style.display = 'none';
+  msg.textContent = '';
+  fetch(SUPABASE_URL + '/functions/v1/deliveries?action=list_available_for_driver', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+    body: '{}'
+  }).then(function(r) { return r.json().then(function(data) { return { ok:r.ok, data:data }; }); }).then(function(result) {
+    var data=result.data||{};
+    if (!result.ok || data.error) throw new Error(data.error || 'Não foi possível carregar os pedidos.');
+    var driver=data.driver||{};
+    estado.textContent = driver.online ? ('🟢 Online · ' + (driver.vehicle_type || 'veículo não configurado') + (driver.vehicle_capacity_kg != null ? ' · ' + driver.vehicle_capacity_kg + ' kg' : '')) : ('⚪ Offline · coloca-te online para receber pedidos');
+    list.innerHTML='';
+    var pedidos=data.deliveries||[];
+    if (!driver.online || pedidos.length===0) { empty.style.display='block'; return; }
+    empty.style.display='none';
+    pedidos.forEach(function(p) {
+      var compat=p.compatibilidade==='COMPATIVEL';
+      var div=document.createElement('div');
+      div.className='list-item';
+      var peso=p.cargo_weight_kg!=null ? p.cargo_weight_kg+' kg' : 'não indicado';
+      var tipo=p.cargo_type||'não indicado';
+      var veiculo=p.requested_vehicle_type||'Matching automático';
+      var capacidade=p.requested_vehicle_capacity_kg!=null ? p.requested_vehicle_capacity_kg+' kg' : 'não indicada';
+      var motivos=(p.motivos||[]).join(' · ');
+      div.innerHTML=
+        '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;">'+
+          '<div>'+
+            '<div class="value-md" style="color:var(--accent);font-weight:700;">📦 #'+(p.tracking_code||'sem código')+'</div>'+
+            '<div style="font-size:12px;font-weight:600;margin-top:4px;">Carga: '+tipo+'</div>'+
+            '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">Peso: '+peso+'</div>'+
+            '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">Veículo: '+veiculo+'</div>'+
+            '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">Capacidade pedida: '+capacidade+'</div>'+
+          '</div>'+
+          '<div style="white-space:nowrap;font-weight:800;color:'+(compat?'var(--success)':'var(--accent)')+';">'+(compat?'🟢 Compatível':'🟡 Alternativa')+'</div>'+
+        '</div>'+
+        (motivos?'<div style="font-size:10.5px;color:var(--text-dim);margin-top:7px;">'+motivos+'</div>':'')+
+        '<div class="btn-row" style="margin-top:10px;"><button data-available-delivery="'+p.id+'" class="estafeta-aceitar-btn btn btn-success-solid btn-sm">Aceitar pedido</button></div>';
+      list.appendChild(div);
+    });
+    document.querySelectorAll('.estafeta-aceitar-btn').forEach(function(b) {
+      b.addEventListener('click', function() {
+        b.disabled=true; b.textContent='A aceitar…';
+        fetch(SUPABASE_URL + '/functions/v1/deliveries?action=accept_delivery', {
+          method:'POST',
+          headers:{'Content-Type':'application/json','apikey':ANON_KEY,'Authorization':'Bearer '+session.access_token},
+          body:JSON.stringify({delivery_id:b.dataset.availableDelivery})
+        }).then(function(r){return r.json().then(function(data){return {ok:r.ok,data:data};});}).then(function(result){
+          if(!result.ok || result.data.error){ throw new Error(result.data.message || result.data.error || 'Pedido já não está disponível.'); }
+          loadPedidosDisponiveisEstafeta();
+          loadMinhasEntregas();
+        }).catch(function(e){
+          b.disabled=false; b.textContent='Aceitar pedido';
+          msg.className='msg msg-error';
+          msg.textContent=e.message;
+        });
+      });
+    });
+  }).catch(function(e) {
+    list.innerHTML='';
+    msg.className='msg msg-error';
+    msg.textContent=e.message || 'Erro de ligação.';
+  });
+}
+document.getElementById('btn-estafeta-disponiveis-refresh')?.addEventListener('click', loadPedidosDisponiveisEstafeta);
 
 function loadMinhasEntregas() {
   if (!session) return;
