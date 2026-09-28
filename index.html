@@ -108,6 +108,22 @@
     color: var(--text); font-size: 14.5px; outline: none; transition: border-color .15s;
   }
   .input:focus { border-color: var(--accent); }
+  /* Seletor multipaís: garantir que as opções nativas ficam visíveis em Android/Web */
+  select.input {
+    appearance: auto;
+    -webkit-appearance: menulist;
+    display: block;
+    position: relative;
+    z-index: 20;
+    background-color: var(--surface-2);
+    color: var(--text);
+  }
+  select.input option {
+    background-color: var(--surface-2);
+    color: var(--text);
+    font-size: 14.5px;
+  }
+
   textarea.input { height: auto; min-height: 76px; padding: var(--sp-3) var(--sp-4); resize: vertical; }
 
   .btn {
