@@ -128,15 +128,19 @@
     appearance: menulist !important;
     -webkit-appearance: menulist !important;
     -moz-appearance: menulist !important;
-    display: block;
-    position: relative;
-    z-index: 50;
+    display: block !important;
+    position: relative !important;
+    z-index: 9999 !important;
+    isolation: isolate;
     background: var(--surface-2) !important;
     background-color: var(--surface-2) !important;
     color: var(--text) !important;
-    color-scheme: dark;
+    -webkit-text-fill-color: var(--text) !important;
+    color-scheme: light;
     opacity: 1 !important;
     text-align: left;
+    pointer-events: auto !important;
+    touch-action: manipulation;
   }
   select.native-menulist option {
     background: var(--surface-2) !important;
@@ -644,7 +648,7 @@ var APP_BUILD_ID = "20260926-101500";
             <button class="entrega-ponto-modo-btn" data-ponto="origem" data-modo="codigo">🔢 Código</button>
             <button class="entrega-ponto-modo-btn" data-ponto="origem" data-modo="qr">📷 QR</button>
           </div>
-          <select id="entrega-origem-select" class="input native-menulist" style="display:none;"><option value="">Escolhe um local guardado...</option></select>
+          <select id="entrega-origem-select" class="input native-menulist" hidden><option value="">Escolhe um local guardado...</option></select>
           <div id="entrega-origem-codigo-box" style="display:none;">
             <input id="entrega-origem-codigo-input" class="input" type="text" placeholder="Código postal, Plus Code, AO-..., ou cola o link" />
             <button id="btn-resolver-origem-codigo" class="btn btn-secondary btn-sm" style="margin-top:6px;">Procurar</button>
@@ -2330,6 +2334,10 @@ function renderMainApp() {
   document.getElementById('view-mfa-forced').classList.remove('visible');
   document.getElementById('view-app').classList.add('visible');
   loadFavorites();
+  // Pré-carrega os Guardados enquanto o ecrã ainda está a abrir.
+  // No Android/WebView o picker nativo lê o <select> no instante do toque;
+  // por isso a lista não pode depender de uma carga iniciada depois do toque.
+  loadEntregaDestinos();
   checkAdmin();
   updateOfflineStatus();
   syncPendingOps();
@@ -3732,7 +3740,17 @@ function entregaAlternarModoPonto(tipo, modo) {
     origem: { guardados:'entrega-origem-select', codigo:'entrega-origem-codigo-box', qr:'entrega-origem-qr-box', gps:'entrega-origem-gps-msg', mapa:null },
     destino: { guardados:'entrega-destino', codigo:'entrega-destino-codigo-box', qr:'entrega-destino-qr-box', mapa:'entrega-destino-mapa-box', gps:null }
   }[prefix];
-  Object.keys(configs).forEach(function(k) { if (configs[k]) document.getElementById(configs[k]).style.display = k === modo ? 'block' : 'none'; });
+  Object.keys(configs).forEach(function(k) {
+    if (!configs[k]) return;
+    var el = document.getElementById(configs[k]);
+    if (k === modo) {
+      el.hidden = false;
+      el.style.display = 'block';
+    } else {
+      el.hidden = true;
+      el.style.display = 'none';
+    }
+  });
   if (modo === 'guardados') {
     // Carregar antes de o utilizador abrir o menu nativo Android.
     // Isto evita que o WebView abra o menulist apenas com o placeholder.
