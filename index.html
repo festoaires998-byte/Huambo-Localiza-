@@ -2,29 +2,7 @@
 <html lang="pt">
 <head>
 <meta charset="UTF-8">
-<script>
-/* Runtime recovery: remove versões antigas do PWA antes do bootstrap.
-   Uma única recarga garante que uma página ainda controlada pelo SW antigo
-   volte a ser servida sem o worker legado. */
-(function(){
-  var KEY='al-runtime-recovery-20260928';
-  try{
-    var regsPromise=('serviceWorker' in navigator)?navigator.serviceWorker.getRegistrations():Promise.resolve([]);
-    regsPromise.then(function(regs){
-      var had=regs&&regs.length>0;
-      var jobs=(regs||[]).map(function(reg){return reg.unregister().catch(function(){return false;});});
-      return Promise.all(jobs).then(function(){
-        if(had && !sessionStorage.getItem(KEY)){
-          sessionStorage.setItem(KEY,'1');
-          return caches.keys().then(function(keys){
-            return Promise.all(keys.map(function(k){return caches.delete(k).catch(function(){});}));
-          }).catch(function(){}).then(function(){ location.reload(); });
-        }
-      });
-    }).catch(function(){});
-  }catch(_){}
-})();
-</script><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Angola Localiza</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#D65B32">
@@ -231,11 +209,11 @@
   .panel { display: none; padding: var(--sp-4) var(--sp-4) var(--sp-5); }
   .panel.visible { display: block; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 </style>
-  <meta name="al-build-id" content="20260928-230500">
+  <meta name="al-build-id" content="20260926-101500">
 </head>
 <body>
 <script>
-var APP_BUILD_ID = "20260928-230500";
+var APP_BUILD_ID = "20260926-101500";
 (function verificarVersaoPublicada(){
   var aviso=null, checking=false;
   function check(){
@@ -331,17 +309,6 @@ var APP_BUILD_ID = "20260928-230500";
       <div class="segmented" style="margin-bottom: var(--sp-4);">
         <button id="tab-signin" class="active">Entrar</button>
         <button id="tab-signup">Criar conta</button>
-      </div>
-      <div id="signup-country-field" class="field" style="display:none;">
-        <label>País onde vais utilizar o Localiza</label>
-        <select id="signup-country" class="input">
-          <option value="AO">🇦🇴 Angola — Angola Localiza</option>
-          <option value="MZ">🇲🇿 Moçambique — Moçambique Localiza</option>
-          <option value="CV">🇨🇻 Cabo Verde — Cabo Verde Localiza</option>
-          <option value="GW">🇬🇼 Guiné-Bissau — Guiné-Bissau Localiza</option>
-          <option value="ST">🇸🇹 São Tomé e Príncipe — São Tomé e Príncipe Localiza</option>
-        </select>
-        <p class="al-enhancement-note">O país fica associado à tua conta e determina a experiência Localiza que vais utilizar.</p>
       </div>
       <div class="field">
         <label>Email</label>
@@ -1803,17 +1770,6 @@ var lastLocation = null;
 var lastAddressId = null;
 var isAdmin = false;
 var mode = "signin";
-var AL_COUNTRY_NAMES = { AO: 'Angola', MZ: 'Moçambique', CV: 'Cabo Verde', GW: 'Guiné-Bissau', ST: 'São Tomé e Príncipe' };
-var AL_COUNTRY_FIELD = document.getElementById('signup-country-field');
-var AL_COUNTRY_SELECT = document.getElementById('signup-country');
-function nomeMarcaPais(codigo) { return (AL_COUNTRY_NAMES[String(codigo || 'AO').toUpperCase()] || 'Angola') + ' Localiza'; }
-function aplicarMarcaPais(codigo) {
-  var marca = nomeMarcaPais(codigo);
-  var brand = document.querySelector('.brand'); if (brand && !brand.closest('#view-login')) brand.textContent = marca;
-  var headerBrand = document.querySelector('.header .brand'); if (headerBrand) headerBrand.textContent = marca;
-  var label = document.getElementById('session-label'); if (label && !session) label.textContent = String(codigo || 'AO').toUpperCase() + ' · sem sessão';
-}
-AL_COUNTRY_SELECT && AL_COUNTRY_SELECT.addEventListener('change', function(){ aplicarMarcaPais(this.value); });
 
 function encodeOLC(lat, lng) {
   var ALPHABET = '23456789CFGHJMPQRVWX';
@@ -1856,8 +1812,6 @@ function setMode(m) {
   tabSignup.classList.toggle('active', m === 'signup');
   btnSubmit.textContent = m === 'signin' ? 'Entrar' : 'Criar conta';
   authMsg.textContent = ''; authMsg.className = 'msg';
-  if (AL_COUNTRY_FIELD) AL_COUNTRY_FIELD.style.display = m === 'signup' ? 'block' : 'none';
-  if (m === 'signup' && AL_COUNTRY_SELECT) aplicarMarcaPais(AL_COUNTRY_SELECT.value);
 }
 tabSignin.addEventListener('click', function() { setMode('signin'); });
 tabSignup.addEventListener('click', function() { setMode('signup'); });
@@ -2191,10 +2145,7 @@ function showApp() {
   document.getElementById('view-recuperar-password').classList.remove('visible');
   document.getElementById('view-nova-password').classList.remove('visible');
   document.getElementById('view-mfa-login').classList.remove('visible');
-  var codigoSessao = 'AO';
-  try { var claims = parseJwt(session.access_token); codigoSessao = String((claims.user_metadata && claims.user_metadata.country_code) || 'AO').toUpperCase(); } catch (e) {}
-  aplicarMarcaPais(codigoSessao);
-  document.getElementById('session-label').textContent = codigoSessao + ' · ' + session.email;
+  document.getElementById('session-label').textContent = 'ANGOLA · ' + session.email;
 
   consumeJoinLinkIfPending().then(function() {
     return checkRoles();
@@ -2391,7 +2342,7 @@ btnSubmit.addEventListener('click', function() {
   btnSubmit.disabled = true; btnSubmit.textContent = 'A processar...';
   var redirectTo = encodeURIComponent(window.location.origin + window.location.pathname);
   var endpoint = mode === 'signin' ? SUPABASE_URL + '/auth/v1/token?grant_type=password' : SUPABASE_URL + '/auth/v1/signup?redirect_to=' + redirectTo;
-  fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY }, body: JSON.stringify(mode === 'signup' ? { email: email, password: password, data: { country_code: (AL_COUNTRY_SELECT && AL_COUNTRY_SELECT.value) || 'AO' } } : { email: email, password: password }) })
+  fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY }, body: JSON.stringify({ email: email, password: password }) })
     .then(function(r) { return r.json().then(function(data) { return { status: r.status, data: data }; }); })
     .then(function(res) {
       btnSubmit.disabled = false; setMode(mode);
@@ -5047,3 +4998,1738 @@ function loadAuditLog() {
     auditLogsCache = data.logs || [];
     var filterSel = document.getElementById('audit-filter-action');
     var currentOptions = Array.from(filterSel.options).map(function(o) { return o.value; });
+    var actions = [...new Set(auditLogsCache.map(function(l) { return l.action; }))];
+    actions.forEach(function(a) { if (currentOptions.indexOf(a) === -1) { var opt = document.createElement('option'); opt.value = a; opt.textContent = AUDIT_LABELS[a] || a; filterSel.appendChild(opt); } });
+    renderAuditLog();
+  }).catch(function() {});
+}
+document.getElementById('audit-filter-action').addEventListener('change', renderAuditLog);
+document.getElementById('btn-limpar-auditoria').addEventListener('click', function() {
+  var digitado = prompt('Isto apaga TODOS os registos de auditoria, para sempre. Escreve exatamente "ELIMINAR TUDO" para confirmar:');
+  if (digitado !== 'ELIMINAR TUDO') { if (digitado !== null) alert('Não confirmado — nada foi apagado.'); return; }
+  fetch(SUPABASE_URL + '/functions/v1/admin?action=clear_audit_logs', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+    body: JSON.stringify({ confirm: 'ELIMINAR TUDO' })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.error) { alert(data.error); return; }
+    alert(data.deleted + ' registo(s) eliminado(s).');
+    loadAuditLog();
+  }).catch(function() { alert('Erro de ligação.'); });
+});
+function renderAuditLog() {
+  var filterVal = document.getElementById('audit-filter-action').value;
+  var logs = filterVal ? auditLogsCache.filter(function(l) { return l.action === filterVal; }) : auditLogsCache;
+  var list = document.getElementById('audit-list');
+  var empty = document.getElementById('audit-empty');
+  list.innerHTML = '';
+  if (logs.length === 0) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  var isSuperAdmin = myRoles.indexOf('super_admin') > -1;
+  logs.slice(0, 15).forEach(function(log) {
+    var div = document.createElement('div');
+    div.className = 'list-item';
+    div.dataset.liveDeliveryId = d.id;
+    var when = new Date(log.created_at).toLocaleString('pt-PT');
+    div.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">' +
+        '<div><div class="value-plain">' + (AUDIT_LABELS[log.action] || log.action) + '</div><div style="font-size:11px;color:var(--text-dim);margin-top:2px;">' + (log.entity_type || '') + ' · ' + when + '</div></div>' +
+        (isSuperAdmin ? '<button data-id="' + log.id + '" class="audit-eliminar-btn icon-btn" aria-label="Eliminar" style="font-size:14px;">🗑️</button>' : '') +
+      '</div>';
+    list.appendChild(div);
+  });
+  document.querySelectorAll('.audit-eliminar-btn').forEach(function(b) {
+    b.addEventListener('click', function() {
+      if (!confirm('Eliminar este registo de auditoria?')) return;
+      fetch(SUPABASE_URL + '/functions/v1/admin?action=delete_audit_log', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+        body: JSON.stringify({ log_id: b.dataset.id })
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.error) { alert(data.error); return; }
+        loadAuditLog();
+      }).catch(function() { alert('Erro de ligação.'); });
+    });
+  });
+}
+
+// ---- Importar/Exportar ----
+document.getElementById('btn-invite').addEventListener('click', function() {
+  sendInvite(false);
+});
+
+var ROLE_LABELS = {
+  super_admin: 'Super admin', admin_nacional: 'Admin nacional', admin_provincial: 'Admin provincial',
+  admin_municipal: 'Admin municipal', supervisor: 'Supervisor', auditor: 'Auditor',
+  operador_postal: 'Operador postal', tecnico_campo: 'Técnico de campo', estafeta: 'Estafeta',
+};
+var ALLOWED_INVITES_CLIENT = {
+  super_admin: ['super_admin','admin_nacional','admin_provincial','admin_municipal','auditor','operador_postal','supervisor','tecnico_campo','estafeta'],
+  admin_nacional: ['admin_provincial','admin_municipal','auditor','operador_postal','supervisor','tecnico_campo','estafeta'],
+  admin_provincial: ['admin_municipal','auditor','operador_postal','supervisor','tecnico_campo','estafeta'],
+  admin_municipal: ['auditor','operador_postal','supervisor','tecnico_campo','estafeta'],
+  supervisor: ['tecnico_campo','estafeta'],
+};
+
+function setupInviteForm() {
+  var myBest = null, myRank = 99;
+  var RANK = { super_admin:0, admin_nacional:1, admin_provincial:2, admin_municipal:3, supervisor:4, auditor:5, operador_postal:5, tecnico_campo:5, estafeta:5 };
+  myRoles.forEach(function(r) { if ((RANK[r] ?? 9) < myRank) { myRank = RANK[r] ?? 9; myBest = r; } });
+
+  var roleSelect = document.getElementById('invite-role');
+  var options = ALLOWED_INVITES_CLIENT[myBest] || [];
+  roleSelect.innerHTML = options.map(function(r) { return '<option value="' + r + '">' + ROLE_LABELS[r] + '</option>'; }).join('');
+
+  var SECTOR_TYPE_LABELS = {
+    governo: 'Governo/Institucional', municipio: 'Município', operador_postal: 'Operador Postal',
+    banco: 'Banco', seguros: 'Seguros', logistica: 'Logística', telecom: 'Telecom',
+    fmcg: 'FMCG', ong: 'ONG', empresa: 'Empresa', outro: 'Outro'
+  };
+  var SECTOR_TYPE_ORDER = ['governo', 'municipio', 'operador_postal', 'banco', 'seguros', 'logistica', 'telecom', 'fmcg', 'ong', 'empresa', 'outro'];
+
+  if (myBest === 'super_admin') {
+    document.getElementById('invite-sector-field').style.display = 'block';
+    document.getElementById('invite-sector-readonly').style.display = 'none';
+    fetch(SUPABASE_URL + '/rest/v1/organizations?select=id,name,type&order=name.asc', { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token } })
+      .then(function(r) { return r.json(); }).then(function(rows) {
+        var byType = {};
+        (rows || []).forEach(function(o) { (byType[o.type] = byType[o.type] || []).push(o); });
+        var html = '';
+        SECTOR_TYPE_ORDER.forEach(function(t) {
+          if (!byType[t] || byType[t].length === 0) return;
+          html += '<optgroup label="' + (SECTOR_TYPE_LABELS[t] || t) + '">';
+          html += byType[t].map(function(o) { return '<option value="' + o.id + '">' + o.name + '</option>'; }).join('');
+          html += '</optgroup>';
+        });
+        document.getElementById('invite-sector').innerHTML = html;
+      });
+  } else {
+    document.getElementById('invite-sector-field').style.display = 'none';
+    var readonlyMsg = document.getElementById('invite-sector-readonly');
+    readonlyMsg.style.display = 'block';
+    fetch(SUPABASE_URL + '/rest/v1/organization_members?select=organizations(name)&limit=1', { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token } })
+      .then(function(r) { return r.json(); }).then(function(rows) {
+        var orgName = rows && rows[0] && rows[0].organizations ? rows[0].organizations.name : '?';
+        readonlyMsg.textContent = 'Setor: ' + orgName + ' (só o super admin pode convidar para outro setor)';
+      });
+  }
+
+  fetch(SUPABASE_URL + '/rest/v1/provinces?select=id,name&order=name.asc', { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token } })
+    .then(function(r) { return r.json(); }).then(function(rows) {
+      var sel = document.getElementById('invite-province');
+      sel.innerHTML = rows.map(function(p) { return '<option value="' + p.id + '">' + p.name + '</option>'; }).join('');
+    });
+
+  roleSelect.addEventListener('change', toggleInviteScopeFields);
+  toggleInviteScopeFields();
+}
+
+function toggleInviteScopeFields() {
+  var role = document.getElementById('invite-role').value;
+  document.getElementById('invite-province-field').style.display = role === 'admin_provincial' ? 'block' : 'none';
+  document.getElementById('invite-municipality-field').style.display = role === 'admin_municipal' ? 'block' : 'none';
+  if (role === 'admin_municipal') loadMunicipalitiesForInvite();
+}
+
+function loadMunicipalitiesForInvite() {
+  var provinceSel = document.getElementById('invite-province');
+  var muniSel = document.getElementById('invite-municipality');
+  // Reutiliza a lista de províncias já carregada para preencher municípios de todas (simplificado: carrega todos)
+  fetch(SUPABASE_URL + '/rest/v1/municipalities?select=id,name,provinces(name)&order=name.asc', { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token } })
+    .then(function(r) { return r.json(); }).then(function(rows) {
+      muniSel.innerHTML = rows.map(function(m) { return '<option value="' + m.id + '">' + m.name + (m.provinces ? ' (' + m.provinces.name + ')' : '') + '</option>'; }).join('');
+    });
+}
+
+function sendInvite(confirmFlag) {
+  var email = document.getElementById('invite-email').value.trim();
+  var role = document.getElementById('invite-role').value;
+  var sectorField = document.getElementById('invite-sector-field');
+  var organizationId = sectorField.style.display !== 'none' ? document.getElementById('invite-sector').value : null;
+  var provinceId = document.getElementById('invite-province').value || null;
+  var municipalityId = document.getElementById('invite-municipality').value || null;
+  var msg = document.getElementById('invite-msg');
+  if (!email) { msg.className = 'msg msg-error'; msg.textContent = 'Introduz o email.'; return; }
+  msg.className = 'msg msg-muted'; msg.textContent = 'A processar...';
+
+  fetch(SUPABASE_URL + '/functions/v1/invite-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+    body: JSON.stringify({ email: email, role: role, organization_id: organizationId, province_id: provinceId, municipality_id: municipalityId, confirm: confirmFlag })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.needs_confirmation) {
+      if (window.confirm(data.message)) { sendInvite(true); } else { msg.className = 'msg msg-muted'; msg.textContent = 'Cancelado.'; }
+      return;
+    }
+    if (data.error) { msg.className = 'msg msg-error'; msg.textContent = data.error; return; }
+    msg.className = 'msg msg-success';
+    msg.textContent = data.promoted ? (email + ' promovido(a) a ' + role + '.') :
+      data.assigned_to_existing_account ? (email + ' já tinha conta — cargo ' + role + ' atribuído.') :
+      (email + ' convidado(a) como ' + role + '. Vai receber um email para definir a palavra-passe.');
+    document.getElementById('invite-email').value = '';
+  }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
+}
+
+document.getElementById('btn-import').addEventListener('click', function() {
+  var fileInput = document.getElementById('import-file');
+  var msg = document.getElementById('import-msg');
+  if (!fileInput.files[0]) { msg.className = 'msg msg-error'; msg.textContent = 'Escolhe um ficheiro CSV primeiro.'; return; }
+  msg.className = 'msg msg-muted'; msg.textContent = 'A processar...';
+
+  var reader = new FileReader();
+  reader.onload = function() {
+    fetch(SUPABASE_URL + '/functions/v1/imports?action=process_csv', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+      body: JSON.stringify({ csv_text: reader.result })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.error) { msg.className = 'msg msg-error'; msg.textContent = data.error; return; }
+      msg.className = 'msg msg-success';
+      msg.textContent = 'Concluído: ' + data.valid + ' válidas, ' + data.invalid + ' inválidas, ' + data.duplicates + ' duplicadas (de ' + data.total + ').';
+    }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
+  };
+  reader.readAsText(fileInput.files[0]);
+});
+
+function exportAs(format) {
+  var msg = document.getElementById('export-msg');
+  msg.className = 'msg msg-muted'; msg.textContent = 'A gerar...';
+  fetch(SUPABASE_URL + '/functions/v1/exports', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+    body: JSON.stringify({ format: format })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.error) { msg.className = 'msg msg-error'; msg.textContent = data.error; return; }
+    var blob = new Blob([data.content], { type: format === 'csv' ? 'text/csv' : 'application/geo+json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'angola-localiza-moradas.' + (format === 'csv' ? 'csv' : 'geojson');
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    msg.className = 'msg msg-success'; msg.textContent = data.row_count + ' moradas exportadas.';
+  }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
+}
+document.getElementById('btn-export-csv').addEventListener('click', function() { exportAs('csv'); });
+document.getElementById('btn-export-geojson').addEventListener('click', function() { exportAs('geojson'); });
+
+// ---- Routing Engine v1 (arquitetura própria) ----
+// O motor trabalha com um grafo rodoviário próprio quando disponível e usa a Edge Function
+// /routing como autoridade online. Sem rede/grafo, devolve uma rota de contingência explícita.
+var ANGOLA_ROUTING_ENGINE = (function () {
+  var CFG = {
+    endpoint: SUPABASE_URL + '/functions/v1/routing',
+    defaultSpeedKmh: 20,
+    maxAlternatives: 3,
+    trafficEnabled: true,
+    offlineEnabled: true
+  };
+  var graph = null;
+
+  function num(v) { return typeof v === 'number' && isFinite(v) ? v : Number(v); }
+  function validPoint(p) { return p && isFinite(num(p.latitude)) && isFinite(num(p.longitude)); }
+  function hav(a,b) { return haversineMetersJS(num(a.latitude),num(a.longitude),num(b.latitude),num(b.longitude)); }
+  function etaFromMeters(meters, speedKmh, serviceMinutes) {
+    var km = Math.max(0, meters) / 1000;
+    var speed = Math.max(1, Number(speedKmh) || CFG.defaultSpeedKmh);
+    return Math.round((km / speed) * 60 + (Number(serviceMinutes) || 0));
+  }
+  function setGraph(g) { graph = g && g.nodes && g.edges ? g : null; return !!graph; }
+  function configure(opts) { opts = opts || {}; Object.keys(opts).forEach(function(k){ if (opts[k] !== undefined) CFG[k] = opts[k]; }); return CFG; }
+
+  function edgeAllowed(edge, options) {
+    if (!edge) return false;
+    if (edge.closed || edge.blocked) return false;
+    var restrictions = (options && options.restrictions) || {};
+    if (restrictions.avoidTolls && edge.toll) return false;
+    if (restrictions.avoidFerries && edge.ferry) return false;
+    if (restrictions.vehicleType && edge.vehicle_types && edge.vehicle_types.indexOf(restrictions.vehicleType) < 0) return false;
+    if (restrictions.maxHeightM != null && edge.max_height_m != null && restrictions.maxHeightM < edge.max_height_m) return false;
+    if (restrictions.maxWeightT != null && edge.max_weight_t != null && restrictions.maxWeightT < edge.max_weight_t) return false;
+    return true;
+  }
+
+  // Dijkstra simples sobre o grafo offline. O grafo pode ser pré-carregado pelo backoffice/PWA.
+  function offlineRoute(start, end, options) {
+    if (!graph || !graph.nodes || !graph.edges || !validPoint(start) || !validPoint(end)) return null;
+    var nodes = graph.nodes, edges = graph.edges, ids = Object.keys(nodes);
+    function nearest(p) { var best=null, bd=Infinity; ids.forEach(function(id){ var d=haversineMetersJS(p.latitude,p.longitude,nodes[id].latitude,nodes[id].longitude); if(d<bd){bd=d;best=id;} }); return best; }
+    var src=nearest(start), dst=nearest(end); if(!src || !dst) return null;
+    var adj={}; ids.forEach(function(id){adj[id]=[];});
+    edges.forEach(function(e){ if(!e || !adj[e.from] || !adj[e.to] || !edgeAllowed(e,options)) return; var dist=Number(e.distance_m)||haversineMetersJS(nodes[e.from].latitude,nodes[e.from].longitude,nodes[e.to].latitude,nodes[e.to].longitude); adj[e.from].push({to:e.to,distance:dist,edge:e}); if(!e.oneway) adj[e.to].push({to:e.from,distance:dist,edge:e}); });
+    var distMap={}, prev={}, used={}; ids.forEach(function(id){distMap[id]=Infinity;}); distMap[src]=0;
+    for(var step=0;step<ids.length;step++){ var u=null, best=Infinity; ids.forEach(function(id){if(!used[id]&&distMap[id]<best){best=distMap[id];u=id;}}); if(!u||u===dst) break; used[u]=true; adj[u].forEach(function(x){var traffic=(options&&options.traffic&&options.traffic[x.edge.id])||1; var w=x.distance*Math.max(0.1,Number(traffic)||1); if(distMap[u]+w<distMap[x.to]){distMap[x.to]=distMap[u]+w;prev[x.to]={id:u,edge:x.edge,distance:x.distance};}}); }
+    if(!isFinite(distMap[dst])) return null;
+    var path=[], cur=dst; while(cur!==src){if(!prev[cur]) return null; path.unshift(cur);cur=prev[cur].id;} path.unshift(src);
+    var meters=0; path.slice(1).forEach(function(id){meters+=prev[id].distance;});
+    var coords=path.map(function(id){return {latitude:nodes[id].latitude,longitude:nodes[id].longitude};});
+    return {source:'offline_graph',coordinates:coords,distance_meters:meters,duration_minutes:etaFromMeters(meters, options&&options.speedKmh, options&&options.serviceMinutes),alternatives:[],traffic_used:!!(options&&options.traffic),offline:true};
+  }
+
+  function request(start,end,options) {
+    options=options||{};
+    if(!validPoint(start)||!validPoint(end)) return Promise.reject(new Error('Pontos de rota inválidos'));
+    if(!navigator.onLine && CFG.offlineEnabled) { var off=offlineRoute(start,end,options); if(off) return Promise.resolve(off); }
+    var payload={version:'1.0',start:start,end:end,alternatives:Math.min(CFG.maxAlternatives,Math.max(1,Number(options.alternatives)||1)),restrictions:options.restrictions||{},traffic:CFG.trafficEnabled ? (options.traffic!==false) : false,traffic_profile:options.traffic_profile||'live',offline:false};
+    return fetch(CFG.endpoint+'?action=route',{method:'POST',headers:{'Content-Type':'application/json','apikey':ANON_KEY,'Authorization':'Bearer '+(session&&session.access_token||'')},body:JSON.stringify(payload)})
+      .then(function(r){if(!r.ok) throw new Error('routing_http_'+r.status);return r.json();})
+      .then(function(data){
+        if(!data || data.error) throw new Error(data&&data.error||'routing_invalid_response');
+        data.source=data.source||'angola_localiza_routing';
+        data.eta_minutes=data.eta_minutes!=null?data.eta_minutes:data.duration_minutes;
+        data.alternatives=data.alternatives||[];
+        data.traffic_used=!!data.traffic_used;
+        return data;
+      }).catch(function(err){
+        if(CFG.offlineEnabled){var fallback=offlineRoute(start,end,options);if(fallback)return fallback;}
+        throw err;
+      });
+  }
+  function optimize(points, options) {
+    options=options||{}; if(!points || points.length<2) return Promise.resolve({order:points||[],legs:[],total_distance_meters:0,total_duration_minutes:0,source:'empty'});
+    var remaining=points.slice(1), current=points[0], order=[current], legs=[], totalD=0,totalT=0;
+    function next(){ if(!remaining.length) return Promise.resolve({order:order,legs:legs,total_distance_meters:Math.round(totalD),total_duration_minutes:Math.round(totalT),source:legs.some(function(l){return l.offline;})?'offline_graph':'angola_localiza_routing'}); var urgent=remaining.filter(function(p){return p.urgent;}), pool=urgent.length?urgent:remaining; var best=null,bestIdx=-1; pool.forEach(function(p){var idx=remaining.indexOf(p),d=hav(current,p);if(d<(best?best._d:Infinity)){best=p;best._d=d;bestIdx=idx;}}); remaining.splice(bestIdx,1); return request(current,best,options).then(function(r){legs.push(r);totalD+=Number(r.distance_meters)||0;totalT+=Number(r.eta_minutes!=null?r.eta_minutes:r.duration_minutes)||0;order.push(best);current=best;return next();}); }
+    return next();
+  }
+  return {configure:configure,setGraph:setGraph,route:request,optimize:optimize,offlineRoute:offlineRoute,etaFromMeters:etaFromMeters,edgeAllowed:edgeAllowed};
+})();
+window.ANGOLA_ROUTING_ENGINE=ANGOLA_ROUTING_ENGINE;
+
+// ---- Minhas Entregas (Estafeta) ----
+var NEXT_DELIVERY_STATUS = { ASSIGNED: 'PICKED_UP', PICKED_UP: 'IN_TRANSIT', IN_TRANSIT: 'OUT_FOR_DELIVERY', OUT_FOR_DELIVERY: 'DELIVERED' };
+var STATUS_LABEL = { ASSIGNED: 'Atribuída', PICKED_UP: 'Recolhida', IN_TRANSIT: 'Em trânsito', OUT_FOR_DELIVERY: 'Saiu para entrega', DELIVERED: 'Entregue', FAILED: 'Falhada', CANCELLED: 'Cancelada', CREATED: 'Criada' };
+var NEXT_ACTION_LABEL = { PICKED_UP: '📤 Recolhi — prova de recolha', IN_TRANSIT: 'Iniciar trânsito', OUT_FOR_DELIVERY: 'A caminho', DELIVERED: 'Cheguei — iniciar POD' };
+var FAILURE_REASON_LABEL = { morada_nao_encontrada: 'Morada não encontrada', destinatario_ausente: 'Destinatário ausente', codigo_incorreto: 'Código incorreto', recusa: 'Recusa', outro: 'Outro' };
+var minhasEntregasCache = [];
+var ordemSugeridaMap = {};
+var tempoEstimadoMap = {};
+
+function haversineMetersJS(lat1, lng1, lat2, lng2) {
+  var R = 6371000, toRad = function(d) { return d * Math.PI / 180; };
+  var dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1);
+  var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+document.getElementById('btn-canal-campo').addEventListener('click', function() { abrirMeusCanaisDeOrganizacao('ORG_CAMPO'); });
+
+document.getElementById('btn-canal-estafetas').addEventListener('click', function() { abrirMeusCanaisDeOrganizacao('ORG_ESTAFETA'); });
+
+document.getElementById('btn-sugerir-ordem').addEventListener('click', function() {
+  var msg = document.getElementById('ordem-sugerida-msg');
+  msg.style.display = 'block'; msg.className = 'msg msg-muted'; msg.textContent = 'A localizar-te...';
+  if (!navigator.geolocation) { msg.className = 'msg msg-error'; msg.textContent = 'Este telemóvel não dá localização.'; return; }
+
+  function ordenarPorLinhaReta(curLat, curLng, ativos) {
+    var urgentes = ativos.filter(function(d) { return d.is_urgent; });
+    var naoUrgentes = ativos.filter(function(d) { return !d.is_urgent; });
+    ordemSugeridaMap = {}; tempoEstimadoMap = {};
+    var n = 1, tempoAcumuladoMin = 0;
+    var origemLat = curLat, origemLng = curLng;
+    [urgentes, naoUrgentes].forEach(function(grupo) {
+      var restantes = grupo.slice();
+      while (restantes.length > 0) {
+        var maisProximoIdx = 0, menorDist = Infinity;
+        restantes.forEach(function(d, i) {
+          var dist = haversineMetersJS(origemLat, origemLng, d.addresses.latitude, d.addresses.longitude);
+          if (dist < menorDist) { menorDist = dist; maisProximoIdx = i; }
+        });
+        var escolhido = restantes.splice(maisProximoIdx, 1)[0];
+        var distKm = haversineMetersJS(origemLat, origemLng, escolhido.addresses.latitude, escolhido.addresses.longitude) / 1000;
+        tempoAcumuladoMin += (distKm / 20) * 60 + 3; // ≈20 km/h + 3 min de serviço por paragem — estimativa simples, sem dados de estrada
+        ordemSugeridaMap[escolhido.id] = n++;
+        tempoEstimadoMap[escolhido.id] = Math.round(tempoAcumuladoMin);
+        origemLat = escolhido.addresses.latitude; origemLng = escolhido.addresses.longitude;
+      }
+    });
+  }
+
+  // Otimiza um grupo de entregas (a partir de um ponto), devolvendo a ordem real pelas
+  // estradas e o tempo previsto (dado que a própria LocationIQ já calcula, não inventado por nós).
+  function otimizarGrupo(startLat, startLng, grupo) {
+    return new Promise(function(resolve, reject) {
+      if (grupo.length === 0) { resolve({ ordemEntregas: [], fimLat: startLat, fimLng: startLng, duracoesAcumuladas: [] }); return; }
+      var pontos = [{latitude:startLat,longitude:startLng}].concat(grupo.map(function(d){ return {latitude:d.addresses.latitude,longitude:d.addresses.longitude,urgent:!!d.is_urgent,delivery:d}; }));
+      ANGOLA_ROUTING_ENGINE.optimize(pontos, { alternatives: 2, traffic: true, restrictions: { vehicleType: 'delivery' } })
+        .then(function(data) {
+          var entregas = data.order.slice(1).map(function(p){ return p.delivery; }).filter(Boolean);
+          var duracoes = [], acumulado = 0;
+          (data.legs || []).forEach(function(leg){ acumulado += Number(leg.eta_minutes != null ? leg.eta_minutes : leg.duration_minutes) || 0; duracoes.push(Math.round(acumulado)); });
+          var ultimo = entregas.length ? entregas[entregas.length-1].addresses : {latitude:startLat,longitude:startLng};
+          resolve({ ordemEntregas: entregas, fimLat: ultimo.latitude, fimLng: ultimo.longitude, duracoesAcumuladas: duracoes, routing_source: data.source, traffic_used: !!data.traffic_used });
+        }).catch(reject);
+    });
+  }
+
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    if (!isValidGpsAccuracy(pos.coords.accuracy)) {
+      msg.className = 'msg msg-error';
+      msg.textContent = gpsAccuracyMessage(pos.coords.accuracy);
+      return;
+    }
+    var curLat = pos.coords.latitude, curLng = pos.coords.longitude;
+    var ativos = minhasEntregasCache.filter(function(d) {
+      return ['ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'].indexOf(d.status) > -1 && d.addresses && d.addresses.latitude && d.addresses.longitude;
+    });
+    if (ativos.length < 2) { msg.className = 'msg msg-muted'; msg.textContent = 'Precisas de pelo menos 2 entregas ativas com localização para sugerir uma ordem.'; return; }
+
+    msg.textContent = 'A calcular a rota pelas estradas...';
+    var urgentes = ativos.filter(function(d) { return d.is_urgent; });
+    var naoUrgentes = ativos.filter(function(d) { return !d.is_urgent; });
+
+    otimizarGrupo(curLat, curLng, urgentes).then(function(resUrgentes) {
+      return otimizarGrupo(resUrgentes.fimLat, resUrgentes.fimLng, naoUrgentes).then(function(resNormais) { return { u: resUrgentes, n: resNormais }; });
+    }).then(function(res) {
+      ordemSugeridaMap = {}; tempoEstimadoMap = {};
+      var n = 1;
+      res.u.ordemEntregas.forEach(function(d, i) { ordemSugeridaMap[d.id] = n++; tempoEstimadoMap[d.id] = res.u.duracoesAcumuladas[i]; });
+      var baseTempo = res.u.duracoesAcumuladas.length ? res.u.duracoesAcumuladas[res.u.duracoesAcumuladas.length - 1] : 0;
+      res.n.ordemEntregas.forEach(function(d, i) { ordemSugeridaMap[d.id] = n++; tempoEstimadoMap[d.id] = baseTempo + res.n.duracoesAcumuladas[i]; });
+      msg.className = 'msg msg-success';
+      msg.textContent = 'Ordem otimizada pelas estradas reais' + (urgentes.length > 0 ? ' — urgentes primeiro' : '') + '.';
+      renderMinhasEntregas();
+    }).catch(function() {
+      // O Routing Engine falhou (ou ficaste sem rede a meio) — a app não bloqueia, usa a linha reta como reserva
+      ordenarPorLinhaReta(curLat, curLng, ativos);
+      msg.className = 'msg msg-muted'; msg.textContent = 'Modo de proximidade linear ativado: os tempos são apenas estimativas teóricas.';
+      renderMinhasEntregas();
+    });
+  }, function() { msg.className = 'msg msg-error'; msg.textContent = 'Não foi possível obter a tua localização.'; }, { enableHighAccuracy: true, timeout: 8000 });
+});
+var minhasEntregasFilter = 'todas';
+var podDeliveryId = null, podPhotoUrl = null;
+var falhaDeliveryId = null;
+
+document.querySelectorAll('.entregas-filter-btn').forEach(function(b) {
+  b.addEventListener('click', function() {
+    document.querySelectorAll('.entregas-filter-btn').forEach(function(x) { x.classList.remove('active'); });
+    b.classList.add('active');
+    minhasEntregasFilter = b.dataset.filter;
+    renderMinhasEntregas();
+  });
+});
+document.getElementById('minhas-entregas-search').addEventListener('input', renderMinhasEntregas);
+
+function loadMinhasEntregas() {
+  if (!session) return;
+  var myId = parseJwt(session.access_token).sub;
+  var list = document.getElementById('minhas-entregas-list');
+  list.innerHTML = '<p class="msg msg-muted">A carregar...</p>';
+  document.getElementById('btn-limpar-historico-entregas').style.display = myRoles.indexOf('super_admin') > -1 ? 'block' : 'none';
+  document.getElementById('btn-sugerir-ordem').style.display = (myRoles.indexOf('estafeta') > -1) ? 'block' : 'none';
+  document.getElementById('btn-canal-estafetas').style.display = (myRoles.indexOf('estafeta') > -1 || myRoles.indexOf('operador_postal') > -1 || myRoles.indexOf('super_admin') > -1) ? 'block' : 'none';
+  ordemSugeridaMap = {};
+
+  var souOperadorPostal = myRoles.indexOf('operador_postal') > -1 || myRoles.indexOf('super_admin') > -1;
+  if (souOperadorPostal) {
+    fetch(SUPABASE_URL + '/functions/v1/deliveries?action=list_org_deliveries', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }, body: '{}'
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      minhasEntregasCache = data.deliveries || [];
+      renderMinhasEntregas();
+      renderEntregasStats();
+    }).catch(function() { list.innerHTML = '<p class="msg msg-error">Erro ao carregar.</p>'; });
+    entregasUpdateOfflineMini();
+    return;
+  }
+
+  var souCidadaoComum = myRoles.length === 0;
+  var filtroEntregas = souCidadaoComum ? ('created_by=eq.' + myId) : ('assigned_driver=eq.' + myId);
+  fetch(SUPABASE_URL + '/rest/v1/deliveries?' + filtroEntregas + '&select=id,tracking_code,status,recipient_name,recipient_phone,instructions,updated_at,origin_postal_code,origin_plus_code,is_urgent,addresses(reference,plus_code,postal_code,house_number,latitude,longitude,streets(name),quadras(code)),delivery_proofs(id)&order=updated_at.desc', {
+    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+  }).then(function(r) { return r.json(); }).then(function(rows) {
+    minhasEntregasCache = rows || [];
+    renderMinhasEntregas();
+    renderEntregasStats();
+  }).catch(function() { list.innerHTML = '<p class="msg msg-error">Erro ao carregar.</p>'; });
+  entregasUpdateOfflineMini();
+}
+
+document.getElementById('btn-limpar-historico-entregas').addEventListener('click', function() {
+  var digitado = prompt('ATENÇÃO: isto apaga TODAS as entregas do sistema, incluindo provas e livro-razão. Escreve exatamente "ELIMINAR TUDO" para confirmar:');
+  if (digitado !== 'ELIMINAR TUDO') { if (digitado !== null) alert('Não confirmado — nada foi apagado.'); return; }
+  if (!confirm('ÚLTIMA CONFIRMAÇÃO: esta ação é potencialmente irreversível. Queres realmente continuar?')) return;
+  fetch(SUPABASE_URL + '/functions/v1/deliveries?action=clear_all', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+    body: JSON.stringify({ confirm: 'ELIMINAR TUDO' })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.error) { alert(data.error); return; }
+    alert(data.deleted + ' entrega(s) eliminada(s).');
+    loadMinhasEntregas();
+  }).catch(function() { alert('Erro de ligação.'); });
+});
+
+function entregasUpdateOfflineMini() {
+  var el = document.getElementById('entregas-offline-mini');
+  var pending = getPendingOps().length;
+  el.onclick = null;
+  if (!navigator.onLine || pending > 0) {
+    el.className = 'msg msg-error';
+    el.innerHTML = (!navigator.onLine ? 'Offline' : 'Ligado') + ' · ' + pending + ' pendentes' + (pending > 0 ? ' · <u>Sincronizar agora</u>' : '');
+    if (pending > 0) el.onclick = function() { syncPendingOps(); setTimeout(entregasUpdateOfflineMini, 800); };
+  } else { el.className = 'msg msg-success'; el.textContent = 'Ligado.'; }
+}
+
+function renderEntregasStats() {
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var todays = minhasEntregasCache.filter(function(d) {
+    return ['DELIVERED', 'FAILED'].indexOf(d.status) > -1 && new Date(d.updated_at) >= today;
+  });
+  var delivered = todays.filter(function(d) { return d.status === 'DELIVERED'; });
+  var withProof = todays.filter(function(d) { return d.delivery_proofs && d.delivery_proofs.length > 0; });
+  var rate = todays.length > 0 ? Math.round((delivered.length / todays.length) * 100) : 0;
+  document.getElementById('entregas-stats').textContent =
+    'Hoje: ' + todays.length + ' entregas · ' + withProof.length + ' com prova · ' + rate + '% sucesso';
+}
+
+function renderMinhasEntregas() {
+  var list = document.getElementById('minhas-entregas-list');
+  var empty = document.getElementById('minhas-entregas-empty');
+  var query = document.getElementById('minhas-entregas-search').value.trim().toLowerCase();
+
+  var rows = minhasEntregasCache.filter(function(d) {
+    if (minhasEntregasFilter === 'em_curso' && ['DELIVERED', 'FAILED', 'CANCELLED'].indexOf(d.status) > -1) return false;
+    if (minhasEntregasFilter === 'falhadas' && d.status !== 'FAILED') return false;
+    if (minhasEntregasFilter === 'concluidas' && d.status !== 'DELIVERED' && d.status !== 'CANCELLED') return false;
+    if (query && d.tracking_code.toLowerCase().indexOf(query) === -1 && d.recipient_name.toLowerCase().indexOf(query) === -1) return false;
+    return true;
+  });
+  if (Object.keys(ordemSugeridaMap).length > 0) {
+    rows.sort(function(a, b) { return (ordemSugeridaMap[a.id] || 999) - (ordemSugeridaMap[b.id] || 999); });
+  }
+
+  list.innerHTML = '';
+  if (rows.length === 0) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  var souVisaoGlobal = myRoles.indexOf('operador_postal') > -1 || myRoles.indexOf('super_admin') > -1;
+  var souOperadorPostal = myRoles.indexOf('operador_postal') > -1 && myRoles.indexOf('super_admin') === -1;
+  var souCidadaoNaLista = myRoles.length === 0;
+
+  rows.forEach(function(d) {
+    var addr = d.addresses || {};
+    var div = document.createElement('div');
+    div.className = 'list-item';
+    var next = NEXT_DELIVERY_STATUS[d.status];
+    var actions = '';
+    if (souCidadaoNaLista) {
+      if (['CREATED', 'ASSIGNED', 'PICKED_UP', 'IN_TRANSIT'].indexOf(d.status) > -1) {
+        actions += '<button data-id="' + d.id + '" data-urgente="' + (!d.is_urgent) + '" class="entrega-urgente-btn btn btn-secondary btn-sm">' + (d.is_urgent ? 'Desmarcar urgente' : '🔴 Marcar urgente') + '</button>';
+      }
+      if (['CREATED', 'ASSIGNED'].indexOf(d.status) > -1) {
+        actions += '<button data-id="' + d.id + '" data-status="CANCELLED" class="entrega-status-btn btn btn-danger-outline btn-sm">Cancelar entrega</button>';
+      }
+    } else if (!souOperadorPostal) {
+      if (next) {
+        actions += '<button data-id="' + d.id + '" data-status="' + next + '" class="entrega-status-btn btn btn-success-solid btn-sm">' + NEXT_ACTION_LABEL[next] + '</button>';
+      }
+      if (d.status === 'OUT_FOR_DELIVERY') {
+        actions += '<button data-id="' + d.id + '" data-status="FAILED" class="entrega-falha-btn btn btn-danger-outline btn-sm">Falhou</button>';
+      }
+      if (d.status === 'FAILED') {
+        actions += '<button data-id="' + d.id + '" data-status="ASSIGNED" class="entrega-status-btn btn btn-secondary btn-sm">🔁 Reagendar tentativa</button>';
+      }
+    }
+    if (myRoles.indexOf('estafeta') > -1 && d.assigned_driver === getCurrentUserId() && ['DELIVERED','FAILED','CANCELLED'].indexOf(d.status) === -1) {
+      actions += '<button data-id="' + d.id + '" class="tracking-share-btn btn btn-secondary btn-sm">📡 Partilhar localização</button>';
+    }
+    if ((!souVisaoGlobal || myRoles.indexOf('super_admin') > -1) && d.status !== 'CANCELLED') {
+      actions += '<button data-id="' + d.id + '" data-titulo="Entrega #' + d.tracking_code + '" class="entrega-chat-btn btn btn-secondary btn-sm">💬 Chat</button>';
+    }
+    if (myRoles.indexOf('super_admin') > -1) {
+      actions += '<button data-id="' + d.id + '" class="entrega-eliminar-btn btn btn-danger-outline btn-sm">🗑️ Eliminar</button>';
+    }
+    var whatsappHref = '';
+    if (d.recipient_phone) {
+      var phoneDigits = d.recipient_phone.replace(/[^0-9]/g, '');
+      var waText = encodeURIComponent('Olá ' + d.recipient_name + ', sou o estafeta da tua entrega ' + d.tracking_code + '. Código Postal: ' + (addr.postal_code || '-'));
+      whatsappHref = 'https://wa.me/' + phoneDigits + '?text=' + waText;
+    }
+    div.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">' +
+        '<div>' +
+          (ordemSugeridaMap[d.id] ? '<div style="display:inline-block;background:var(--accent);color:#FBF6EE;font-weight:700;font-size:11px;border-radius:999px;padding:1px 8px;margin-bottom:4px;">🧭 ' + ordemSugeridaMap[d.id] + 'ª paragem' + (tempoEstimadoMap[d.id] ? ' · ≈' + tempoEstimadoMap[d.id] + ' min' : '') + '</div>' : '') +
+          (d.is_urgent ? '<div style="display:inline-block;background:var(--danger);color:#FBF6EE;font-weight:700;font-size:11px;border-radius:999px;padding:1px 8px;margin-bottom:4px;margin-left:4px;">🔴 Urgente</div>' : '') +
+          (souVisaoGlobal && d.driver_email ? '<div style="font-size:10.5px;color:var(--verified);">🧑‍✈️ ' + d.driver_email + '</div>' : '') +
+          (d.origin_postal_code || d.origin_plus_code ? '<div style="font-size:10.5px;color:var(--text-dim);">📤 Recolha: ' + (d.origin_postal_code || '') + (d.origin_plus_code ? ' · ' + d.origin_plus_code : '') + '</div>' : '') +
+          '<div class="value-md" style="color:var(--accent);font-weight:700;font-size:15px;margin-top:2px;">📥 ' + (addr.postal_code || 'sem código') + '</div>' +
+          (addr.plus_code ? '<div style="font-size:10.5px;color:var(--text-faint);">' + addr.plus_code + '</div>' : '') +
+          '<div style="font-size:10px;color:var(--text-faint);margin-top:2px;">#' + d.tracking_code + '</div>' +
+          '<div style="font-size:12.5px;font-weight:600;margin-top:4px;">' + d.recipient_name + '</div>' +
+          (addr.streets ? '<div style="font-size:11px;color:var(--text-dim);margin-top:2px;">' + addr.streets.name + (addr.quadras ? ' · Quadra ' + addr.quadras.code : '') + (addr.house_number ? ' · nº ' + addr.house_number : '') + '</div>' : '') +
+          (addr.reference ? '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">📍 ' + addr.reference + '</div>' : '') +
+          (d.instructions ? '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">📝 ' + d.instructions + '</div>' : '') +
+          '<div class="live-status" style="font-size:11.5px;color:var(--text-dim);margin-top:4px;">' + (STATUS_LABEL[d.status] || d.status) + '</div>' +
+          '<div class="live-location" style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">📡 Aguardando localização do estafeta</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px;">' +
+          (whatsappHref ? '<a href="' + whatsappHref + '" target="_blank" class="icon-btn" aria-label="WhatsApp" style="text-decoration:none;">💬</a>' : '') +
+          (d.recipient_phone ? '<a href="tel:' + d.recipient_phone + '" class="icon-btn" aria-label="Ligar" style="text-decoration:none;">📞</a>' : '') +
+        '</div>' +
+      '</div>' +
+      (actions ? '<div class="btn-row" style="margin-top:10px;">' + actions + '</div>' : '');
+    list.appendChild(div);
+    subscribeDeliveryRealtime(d.id);
+  });
+
+  document.querySelectorAll('.tracking-share-btn').forEach(function(b) {
+    b.addEventListener('click', function() { toggleDeliveryLocationSharing(b.dataset.id, b); });
+  });
+
+  document.querySelectorAll('.entrega-urgente-btn').forEach(function(b) {
+    b.addEventListener('click', function() {
+      fetch(SUPABASE_URL + '/functions/v1/deliveries?action=set_urgent', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+        body: JSON.stringify({ delivery_id: b.dataset.id, is_urgent: b.dataset.urgente === 'true' })
+      }).then(function(r) { return r.json(); }).then(function() { loadMinhasEntregas(); });
+    });
+  });
+
+  document.querySelectorAll('.entrega-chat-btn').forEach(function(b) {
+    b.addEventListener('click', function() { abrirChat('DELIVERY', b.dataset.id, b.dataset.titulo); });
+  });
+
+  document.querySelectorAll('.entrega-eliminar-btn').forEach(function(b) {
+    b.addEventListener('click', function() {
+      if (!confirm('Eliminar esta entrega para sempre (incluindo provas)?')) return;
+      fetch(SUPABASE_URL + '/functions/v1/deliveries?action=delete_one', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+        body: JSON.stringify({ delivery_id: b.dataset.id })
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.error) { alert(data.error); return; }
+        loadMinhasEntregas();
+      }).catch(function() { alert('Erro de ligação.'); });
+    });
+  });
+
+  document.querySelectorAll('.entrega-status-btn').forEach(function(b) {
+    b.addEventListener('click', function() {
+      var newStatus = b.dataset.status;
+      if (newStatus === 'PICKED_UP') { openPickupBox(b.dataset.id, entregaFindDeliveryById(b.dataset.id)); return; }
+      if (newStatus === 'DELIVERED') { openPodBox(b.dataset.id); return; }
+      fetch(SUPABASE_URL + '/functions/v1/deliveries?action=update_status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+        body: JSON.stringify({ delivery_id: b.dataset.id, new_status: newStatus })
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.error) { alert(data.error); return; }
+        loadMinhasEntregas();
+      });
+    });
+  });
+  document.querySelectorAll('.entrega-falha-btn').forEach(function(b) {
+    b.addEventListener('click', function() { openFalhaBox(b.dataset.id); });
+  });
+}
+
+// ---- POD (foto + assinatura) ----
+var podSigCanvas, podSigCtx, podSigDrawing = false, podSigHasContent = false;
+function podInitSignature() {
+  podSigCanvas = document.getElementById('pod-signature-canvas');
+  podSigCanvas.width = podSigCanvas.offsetWidth; podSigCanvas.height = 140;
+  podSigCtx = podSigCanvas.getContext('2d');
+  podSigCtx.strokeStyle = 'var(--surface)'; podSigCtx.lineWidth = 2; podSigCtx.lineCap = 'round';
+  podSigHasContent = false;
+
+  function pos(e) {
+    var r = podSigCanvas.getBoundingClientRect();
+    var p = e.touches ? e.touches[0] : e;
+    return { x: p.clientX - r.left, y: p.clientY - r.top };
+  }
+  function start(e) { podSigDrawing = true; var p = pos(e); podSigCtx.beginPath(); podSigCtx.moveTo(p.x, p.y); }
+  function move(e) { if (!podSigDrawing) return; e.preventDefault(); var p = pos(e); podSigCtx.lineTo(p.x, p.y); podSigCtx.stroke(); podSigHasContent = true; }
+  function end() { podSigDrawing = false; }
+  podSigCanvas.onmousedown = start; podSigCanvas.onmousemove = move; podSigCanvas.onmouseup = end;
+  podSigCanvas.ontouchstart = start; podSigCanvas.ontouchmove = move; podSigCanvas.ontouchend = end;
+}
+document.getElementById('btn-pod-limpar-assinatura').addEventListener('click', function() {
+  podSigCtx.clearRect(0, 0, podSigCanvas.width, podSigCanvas.height);
+  podSigCtx.fillStyle = '#ffffff'; podSigCtx.fillRect(0, 0, podSigCanvas.width, podSigCanvas.height);
+  podSigHasContent = false;
+});
+
+function entregaFindDeliveryById(id) {
+  return minhasEntregasCache.find(function(d) { return d.id === id; }) || {};
+}
+
+function drawProofWatermark(ctx, w, h, codeText) {
+  var barHeight = Math.max(28, Math.round(h * 0.065));
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, h - barHeight, w, barHeight);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = Math.round(barHeight * 0.34) + 'px sans-serif';
+  ctx.textBaseline = 'middle';
+  var when = new Date().toLocaleString('pt-PT');
+  ctx.fillText('📦 ' + (codeText || 'sem código'), 10, h - barHeight * 0.68);
+  ctx.fillText(when, 10, h - barHeight * 0.28);
+}
+
+var pickupDeliveryId = null, pickupPhotoUrl = null;
+function openPickupBox(deliveryId, delivery) {
+  pickupDeliveryId = deliveryId; pickupPhotoUrl = null;
+  document.getElementById('pickup-photo-preview').style.display = 'none';
+  document.getElementById('pickup-photo-status').textContent = '';
+  document.getElementById('pickup-photo-input').value = '';
+  document.getElementById('pickup-observacao').value = '';
+  document.getElementById('pickup-msg').textContent = '';
+  document.getElementById('btn-pickup-confirmar').disabled = true;
+  document.getElementById('pickup-box').style.display = 'block';
+  document.getElementById('pickup-box').scrollIntoView({ behavior: 'smooth' });
+  pickupBoxCodigo = delivery.origin_postal_code || delivery.origin_plus_code || (delivery.addresses && delivery.addresses.postal_code) || '';
+}
+var pickupBoxCodigo = '';
+document.getElementById('btn-pickup-cancelar').addEventListener('click', function() { document.getElementById('pickup-box').style.display = 'none'; });
+
+document.getElementById('pickup-photo-input').addEventListener('change', function(e) {
+  var file = e.target.files[0];
+  var statusEl = document.getElementById('pickup-photo-status');
+  var preview = document.getElementById('pickup-photo-preview');
+  if (!file) return;
+  statusEl.className = 'msg msg-muted'; statusEl.textContent = 'A processar...';
+  var img = new Image(); var reader = new FileReader();
+  reader.onload = function(ev) {
+    img.onload = function() {
+      var maxDim = 1280;
+      var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      var w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+      var canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
+      drawProofWatermark(ctx, w, h, pickupBoxCodigo);
+      canvas.toBlob(function(blob) {
+        setPreviewObjectURL(preview.id, blob); preview.style.display = 'block';
+        statusEl.textContent = 'A enviar (' + Math.round(blob.size / 1024) + ' KB)...';
+        uploadFotoComFallback(blob, 'field-photos', 'pickup').then(function(res) {
+          if (res.ok) {
+            pickupPhotoUrl = res.url; statusEl.className = 'msg msg-success'; statusEl.textContent = 'Foto pronta.';
+          } else {
+            pickupPhotoUrl = res.marcador; statusEl.className = 'msg msg-success'; statusEl.textContent = '📴 Sem rede — foto guardada, envia-se sozinha mais tarde.';
+          }
+          document.getElementById('btn-pickup-confirmar').disabled = false;
+        });
+      }, 'image/jpeg', 0.65);
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('btn-pickup-confirmar').addEventListener('click', function() {
+  var msg = document.getElementById('pickup-msg');
+  if (!pickupPhotoUrl) { msg.className = 'msg msg-error'; msg.textContent = 'Tira a foto primeiro.'; return; }
+  msg.className = 'msg msg-muted'; msg.textContent = 'A confirmar...';
+  var proof = { observation: document.getElementById('pickup-observacao').value.trim(), photo_url: pickupPhotoUrl };
+  function send() {
+    var payload = { delivery_id: pickupDeliveryId, new_status: 'PICKED_UP', proof: proof };
+    if (!navigator.onLine || pickupPhotoUrl.indexOf('offline:') === 0) {
+      queuePendingOp('delivery_proof', payload);
+      document.getElementById('pickup-box').style.display = 'none';
+      msg.textContent = '';
+      loadMinhasEntregas();
+      return;
+    }
+    fetch(SUPABASE_URL + '/functions/v1/deliveries?action=update_status', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.error) { msg.className = 'msg msg-error'; msg.textContent = data.error; return; }
+      document.getElementById('pickup-box').style.display = 'none';
+      loadMinhasEntregas();
+    }).catch(function() {
+      queuePendingOp('delivery_proof', payload);
+      document.getElementById('pickup-box').style.display = 'none';
+      loadMinhasEntregas();
+    });
+  }
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(pos) { proof.latitude = pos.coords.latitude; proof.longitude = pos.coords.longitude; send(); }, send, { timeout: 8000 });
+  } else { send(); }
+});
+
+function openPodBox(deliveryId) {
+  podDeliveryId = deliveryId; podPhotoUrl = null;
+  document.getElementById('pod-photo-preview').style.display = 'none';
+  document.getElementById('pod-photo-status').textContent = '';
+  document.getElementById('pod-photo-input').value = '';
+  document.getElementById('pod-observacao').value = '';
+  document.getElementById('pod-pin').value = '';
+  document.getElementById('pod-volumoso').checked = false;
+  document.getElementById('pod-espera-longa').checked = false;
+  document.getElementById('pod-msg').textContent = '';
+  document.getElementById('pod-box').style.display = 'block';
+  document.getElementById('pod-box').scrollIntoView({ behavior: 'smooth' });
+  podInitSignature();
+  var d = entregaFindDeliveryById(deliveryId);
+  podBoxCodigo = (d.addresses && d.addresses.postal_code) || (d.addresses && d.addresses.plus_code) || '';
+}
+var podBoxCodigo = '';
+document.getElementById('btn-pod-cancelar').addEventListener('click', function() { document.getElementById('pod-box').style.display = 'none'; });
+
+document.getElementById('pod-photo-input').addEventListener('change', function(e) {
+  var file = e.target.files[0];
+  var statusEl = document.getElementById('pod-photo-status');
+  var preview = document.getElementById('pod-photo-preview');
+  if (!file) return;
+  statusEl.className = 'msg msg-muted'; statusEl.textContent = 'A processar...';
+  var img = new Image(); var reader = new FileReader();
+  reader.onload = function(ev) {
+    img.onload = function() {
+      var maxDim = 1280;
+      var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      var w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+      var canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
+      drawProofWatermark(ctx, w, h, podBoxCodigo);
+      canvas.toBlob(function(blob) {
+        setPreviewObjectURL(preview.id, blob); preview.style.display = 'block';
+        statusEl.textContent = 'A enviar (' + Math.round(blob.size / 1024) + ' KB)...';
+        uploadFotoComFallback(blob, 'field-photos', 'pod').then(function(res) {
+          if (res.ok) { podPhotoUrl = res.url; statusEl.className = 'msg msg-success'; statusEl.textContent = 'Foto pronta.'; }
+          else { podPhotoUrl = res.marcador; statusEl.className = 'msg msg-success'; statusEl.textContent = '📴 Sem rede — foto guardada, envia-se sozinha mais tarde.'; }
+        });
+      }, 'image/jpeg', 0.65);
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('btn-pod-confirmar').addEventListener('click', function() {
+  var msg = document.getElementById('pod-msg');
+  var pin = document.getElementById('pod-pin').value.trim();
+  if (!pin) { msg.className = 'msg msg-error'; msg.textContent = 'Introduz o PIN.'; return; }
+  if (!podPhotoUrl) { msg.className = 'msg msg-error'; msg.textContent = 'A foto de prova de entrega é obrigatória.'; return; }
+  if (!podSigHasContent) { msg.className = 'msg msg-error'; msg.textContent = 'A assinatura é obrigatória para concluir a entrega.'; return; }
+  msg.className = 'msg msg-muted'; msg.textContent = 'A confirmar...';
+
+  function finish(signatureUrl, sigOffline) {
+    function send(proof) {
+      var payload = { delivery_id: podDeliveryId, new_status: 'DELIVERED', pin: pin, proof: proof, is_volumoso: document.getElementById('pod-volumoso').checked, is_espera_longa: document.getElementById('pod-espera-longa').checked };
+      var temAlgoOffline = (podPhotoUrl && podPhotoUrl.indexOf('offline:') === 0) || sigOffline;
+      if (!navigator.onLine || temAlgoOffline) {
+        queuePendingOp('delivery_proof', payload);
+        document.getElementById('pod-box').style.display = 'none';
+        msg.textContent = '';
+        loadMinhasEntregas();
+        return;
+      }
+      fetch(SUPABASE_URL + '/functions/v1/deliveries?action=update_status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+        body: JSON.stringify(payload)
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.error) { msg.className = 'msg msg-error'; msg.textContent = data.error; return; }
+        document.getElementById('pod-box').style.display = 'none';
+        loadMinhasEntregas();
+      }).catch(function() {
+        queuePendingOp('delivery_proof', payload);
+        document.getElementById('pod-box').style.display = 'none';
+        loadMinhasEntregas();
+      });
+    }
+    var proof = { observation: document.getElementById('pod-observacao').value.trim(), photo_url: podPhotoUrl, signature_url: signatureUrl };
+    function comAssinatura(lat, lng) {
+      if (typeof lat === 'number') { proof.latitude = lat; proof.longitude = lng; }
+      assinarDadosEntrega(podDeliveryId, proof.latitude, proof.longitude).then(function(assinado) {
+        if (assinado) {
+          proof.crypto_signature = assinado.assinatura;
+          proof.crypto_payload = assinado.payload_assinado;
+          proof.crypto_algorithm = assinado.algoritmo;
+          proof.crypto_device_id = assinado.device_id;
+        }
+        send(proof);
+      });
+    }
+    if (!navigator.geolocation) { msg.className = 'msg msg-error'; msg.textContent = 'Este dispositivo não fornece GPS; não é possível concluir o POD com prova de localização.'; return; }
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      if (!isValidGpsAccuracy(pos.coords.accuracy)) {
+        msg.className = 'msg msg-error'; msg.textContent = gpsAccuracyMessage(pos.coords.accuracy); return;
+      }
+      comAssinatura(pos.coords.latitude, pos.coords.longitude);
+    }, function() {
+      msg.className = 'msg msg-error'; msg.textContent = 'Não foi possível obter a localização. Tenta novamente num local com GPS.';
+    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+  }
+
+  if (podSigHasContent) {
+    podSigCanvas.toBlob(function(blob) {
+      uploadFotoComFallback(blob, 'field-photos', 'sig', 'image/png').then(function(res) {
+        if (res.ok) finish(res.url, false); else finish(res.marcador, true);
+      });
+    }, 'image/png');
+  } else { msg.className = 'msg msg-error'; msg.textContent = 'Assinatura obrigatória.'; }
+});
+
+// ---- Falha estruturada ----
+function openFalhaBox(deliveryId) {
+  falhaDeliveryId = deliveryId;
+  document.getElementById('falha-nota').value = '';
+  document.getElementById('falha-msg').textContent = '';
+  document.getElementById('falha-box').style.display = 'block';
+  document.getElementById('falha-box').scrollIntoView({ behavior: 'smooth' });
+}
+document.getElementById('btn-falha-cancelar').addEventListener('click', function() { document.getElementById('falha-box').style.display = 'none'; });
+document.getElementById('btn-falha-confirmar').addEventListener('click', function() {
+  var msg = document.getElementById('falha-msg');
+  var reason = document.getElementById('falha-motivo').value;
+  var nota = document.getElementById('falha-nota').value.trim();
+  msg.className = 'msg msg-muted'; msg.textContent = 'A confirmar...';
+
+  function send(proof) {
+    fetch(SUPABASE_URL + '/functions/v1/deliveries?action=update_status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+      body: JSON.stringify({ delivery_id: falhaDeliveryId, new_status: 'FAILED', reason: reason, proof: proof })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.error) { msg.className = 'msg msg-error'; msg.textContent = data.error; return; }
+      document.getElementById('falha-box').style.display = 'none';
+      loadMinhasEntregas();
+    }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
+  }
+  var proof = { observation: nota };
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(pos) { proof.latitude = pos.coords.latitude; proof.longitude = pos.coords.longitude; send(proof); }, function() { send(proof); }, { timeout: 8000 });
+  } else { send(proof); }
+});
+
+// ---- Campo (Técnico de Campo) ----
+var campoDeviceId = 'web-' + Math.random().toString(36).slice(2);
+var campoLocation = null; // { lat, lng, plusCode, accuracy }
+var campoPhotoFacadeUrl = null;
+var campoDuplicate = null; // { found, distance_meters, postal_code, address_id }
+var campoDuplicateOverrideReason = null;
+var campoQuadraCode = null;
+var campoInfillBase = null;
+
+function campoSelectedNeighborhoodChoice() {
+  var sel = document.getElementById('campo-neighborhood-select').value;
+  if (sel === '__new_named__' || sel === '__sugestao_externa__') return { neighborhood_name: document.getElementById('campo-neighborhood-new-name').value.trim() };
+  if (sel === '__new_unnamed__') return { neighborhood_name: null };
+  if (sel) return { neighborhood_name: sel };
+  return null;
+}
+
+function campoSelectedStreetChoice() {
+  var sel = document.getElementById('campo-street-select').value;
+  if (sel === '__new_named__' || sel === '__sugestao_externa__') return { street_name: document.getElementById('campo-street-new-name').value.trim() };
+  if (sel === '__new_unnamed__') return { new_unnamed_street: true };
+  if (sel) return { street_id: sel };
+  return null;
+}
+
+function campoUpdateSubmitState() {
+  // Um possível duplicado nunca é ultrapassado silenciosamente: exige decisão explícita do agente.
+  var duplicateDecisionOk = !campoDuplicate || !!campoDuplicateOverrideReason;
+  var btn = document.getElementById('btn-campo-enviar');
+  var accuracyOk = campoLocation && isValidGpsAccuracy(campoLocation.accuracy);
+  var duplicateOk = !campoDuplicate || !campoDuplicate.found || !!campoDuplicateOverrideReason;
+  var streetChoice = campoSelectedStreetChoice();
+  var streetOk = streetChoice && (streetChoice.street_id || streetChoice.new_unnamed_street || (streetChoice.street_name && streetChoice.street_name.length > 0));
+  var infillOk = !document.getElementById('campo-porta-intercalada').checked || !!campoInfillBase;
+  var bairroChoice = campoSelectedNeighborhoodChoice();
+  var bairroOk = !!bairroChoice && (bairroChoice.neighborhood_name === null || (bairroChoice.neighborhood_name && bairroChoice.neighborhood_name.length > 0));
+  var ok = !!campoLocation && accuracyOk && duplicateOk && streetOk && infillOk && bairroOk &&
+    document.getElementById('campo-reference').value.trim() &&
+    campoPhotoFacadeUrl;
+  btn.disabled = !ok;
+}
+['campo-reference', 'campo-neighborhood-new-name', 'campo-precisao-justificacao', 'campo-street-new-name'].forEach(function(id) {
+  document.getElementById(id).addEventListener('input', campoUpdateSubmitState);
+});
+
+document.getElementById('campo-neighborhood-select').addEventListener('change', function() {
+  var mostrar = this.value === '__new_named__' || this.value === '__sugestao_externa__';
+  document.getElementById('campo-neighborhood-new-name').style.display = mostrar ? 'block' : 'none';
+  if (this.value === '__sugestao_externa__') document.getElementById('campo-neighborhood-new-name').value = campoLocation.sugestaoBairroExterna || '';
+  campoUpdateSubmitState();
+});
+
+document.getElementById('campo-street-select').addEventListener('change', function() {
+  var mostrar = this.value === '__new_named__' || this.value === '__sugestao_externa__';
+  document.getElementById('campo-street-new-name').style.display = mostrar ? 'block' : 'none';
+  if (this.value === '__sugestao_externa__') document.getElementById('campo-street-new-name').value = campoLocation.sugestaoRuaExterna || '';
+  campoInfillBase = null;
+  if (document.getElementById('campo-porta-intercalada').checked && this.value && this.value.indexOf('__new') !== 0 && this.value !== '__sugestao_externa__') {
+    campoLoadInfillOptions(this.value);
+  }
+  campoUpdateSubmitState();
+});
+
+document.getElementById('campo-porta-intercalada').addEventListener('change', function() {
+  var box = document.getElementById('campo-infill-box');
+  var streetId = document.getElementById('campo-street-select').value;
+  if (this.checked && streetId && streetId.indexOf('__new') !== 0) {
+    box.style.display = 'block';
+    campoLoadInfillOptions(streetId);
+  } else {
+    box.style.display = 'none';
+    campoInfillBase = null;
+  }
+  campoUpdateSubmitState();
+});
+
+function campoLoadInfillOptions(streetId) {
+  fetch(SUPABASE_URL + '/functions/v1/field-service?action=nearby_house_numbers', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+    body: JSON.stringify({ street_id: streetId })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    var sel = document.getElementById('campo-infill-base');
+    var numbers = data.house_numbers || [];
+    sel.innerHTML = numbers.length ? numbers.map(function(n) { return '<option value="' + n + '">nº ' + n + '</option>'; }).join('') : '<option value="">(sem números ainda nesta rua)</option>';
+    campoInfillBase = numbers[0] || null;
+    sel.onchange = function() { campoInfillBase = sel.value || null; campoUpdateSubmitState(); };
+    campoUpdateSubmitState();
+  });
+}
+
+function campoLoadStreetsForQuadra(lat, lng) {
+  fetch(SUPABASE_URL + '/functions/v1/field-service?action=list_streets_in_quadra', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+    body: JSON.stringify({ latitude: lat, longitude: lng })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    campoQuadraCode = data.quadra_code;
+    document.getElementById('campo-quadra-chip').textContent = 'Quadra ' + data.quadra_code + ' · ' + data.kind + ' · ≈' + Math.round(data.area_m2) + ' m²';
+    var sel = document.getElementById('campo-street-select');
+    var existing = (data.streets || []).map(function(s) { return '<option value="' + s.id + '">' + s.name + ' (próx. nº ' + s.next_seq + ')</option>'; }).join('');
+    sel.innerHTML = '<option value="">Escolhe uma rua...</option>' + existing +
+      '<option value="__new_named__">+ Nova rua (com nome)</option>' +
+      '<option value="__new_unnamed__">+ Nova rua sem nome (Rua S/Nº)</option>';
+
+    var selBairro = document.getElementById('campo-neighborhood-select');
+    var bairrosExistentes = (data.neighborhoods_nearby || []).map(function(nome) { return '<option value="' + nome.replace(/"/g, '&quot;') + '">' + nome + '</option>'; }).join('');
+    selBairro.innerHTML = '<option value="">Escolhe um bairro...</option>' + bairrosExistentes +
+      '<option value="__new_named__">+ Novo bairro (com nome)</option>' +
+      '<option value="__new_unnamed__">+ Novo bairro (sem nome)</option>';
+    document.getElementById('campo-neighborhood-new-name').style.display = 'none';
+    campoLocation.ruasLocaisCount = (data.streets || []).length;
+    campoLocation.bairrosLocaisCount = (data.neighborhoods_nearby || []).length;
+    campoTentarInjetarSugestaoExterna();
+    campoUpdateSubmitState();
+  }).catch(function() { document.getElementById('campo-quadra-chip').textContent = 'erro ao calcular'; });
+}
+
+// Só usa a sugestão da LocationIQ (já paga, sem custo extra) quando a nossa própria base
+// não tinha NADA por perto para sugerir — nunca escolhe sozinha, só pré-preenche o campo
+// de "novo nome", claramente identificada como vinda de fora.
+function campoTentarInjetarSugestaoExterna() {
+  if (!campoLocation || campoLocation.ruasLocaisCount === undefined || campoLocation.sugestaoRuaExterna === undefined) return;
+
+  if (campoLocation.ruasLocaisCount === 0 && campoLocation.sugestaoRuaExterna) {
+    var selRua = document.getElementById('campo-street-select');
+    var opt = document.createElement('option');
+    opt.value = '__sugestao_externa__';
+    opt.textContent = '🌐 "' + campoLocation.sugestaoRuaExterna + '" (sugestão externa, confirma o nome)';
+    selRua.insertBefore(opt, selRua.querySelector('option[value="__new_named__"]'));
+  }
+  if (campoLocation.bairrosLocaisCount === 0 && campoLocation.sugestaoBairroExterna) {
+    var selBairro = document.getElementById('campo-neighborhood-select');
+    var optB = document.createElement('option');
+    optB.value = '__sugestao_externa__';
+    optB.textContent = '🌐 "' + campoLocation.sugestaoBairroExterna + '" (sugestão externa, confirma o nome)';
+    selBairro.insertBefore(optB, selBairro.querySelector('option[value="__new_named__"]'));
+  }
+}
+
+function campoLoadDailyCount() {
+  fetch(SUPABASE_URL + '/functions/v1/field-service?action=daily_count', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }, body: '{}'
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    document.getElementById('campo-daily-count').textContent = (data.count ?? 0) + '/40 hoje';
+  }).catch(function() {});
+}
+
+function campoUpdateOfflineMini() {
+  var el = document.getElementById('campo-offline-mini');
+  var pending = getPendingOps().length;
+  el.onclick = null;
+  if (!navigator.onLine || pending > 0) {
+    el.className = 'msg msg-error';
+    el.innerHTML = (!navigator.onLine ? 'Offline' : 'Ligado') + ' · ' + pending + ' pendentes' + (pending > 0 ? ' · <u>Sincronizar agora</u>' : '');
+    if (pending > 0) el.onclick = function() { syncPendingOps(); setTimeout(campoUpdateOfflineMini, 800); };
+  } else {
+    el.className = 'msg msg-success'; el.textContent = 'Ligado.';
+  }
+}
+
+function campoLoadReverificar() {
+  fetch(SUPABASE_URL + '/functions/v1/field-service?action=list_flagged_for_reverify', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }, body: '{}'
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    var box = document.getElementById('campo-reverificar-box');
+    var badge = document.getElementById('badge-reverificar');
+    if (data.error) { box.style.display = 'none'; return; }
+    var flagged = data.flagged || [];
+    if (flagged.length === 0) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    badge.style.display = 'inline-block'; badge.textContent = flagged.length;
+    document.getElementById('campo-reverificar-list').innerHTML = flagged.map(function(a) {
+      return '<div class="list-item">' +
+        '<div class="value-plain" style="color:var(--accent);font-weight:600;">' + (a.postal_code || a.plus_code || 'sem código') + '</div>' +
+        '<div style="font-size:11px;color:var(--danger);margin-top:2px;">Motivo: ' + a.reason + '</div>' +
+        '<div style="font-size:11px;color:var(--text-dim);margin-top:2px;">' + (a.reference || '') + ' · ' + a.latitude.toFixed(4) + ', ' + a.longitude.toFixed(4) + '</div>' +
+        '</div>';
+    }).join('') + '<p style="font-size:11px;color:var(--text-dim);margin-top:8px;">Vai ao local e captura de novo abaixo — o sistema deteta sozinho que é a mesma morada (a 15 m) e o supervisor pode fundir para atualizar.</p>';
+  }).catch(function() {});
+}
+
+function campoLoadBairros() {
+  // Substituído pelas sugestões de bairro devolvidas junto com as ruas
+  // (ver campoLoadStreetsForQuadra) — mantido vazio só para não quebrar chamadas antigas.
+}
+
+function campoCaptureGps() {
+  var valueEl = document.getElementById('campo-gps-value');
+  valueEl.className = 'msg msg-muted'; valueEl.textContent = 'A obter leituras contínuas de GPS durante 4 segundos...';
+  document.getElementById('campo-gps-card').style.display = 'none';
+  document.getElementById('campo-duplicado-box').style.display = 'none';
+  campoDuplicate = null; campoDuplicateOverrideReason = null;
+
+  if (!navigator.geolocation) { valueEl.className='msg msg-error'; valueEl.textContent='Este dispositivo não suporta GPS.'; return; }
+  var readings = [];
+  var watchId = null;
+  var finished = false;
+  var startedAt = Date.now();
+  function finishCaptureOnce() {
+    if (finished) return;
+    finished = true;
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    if (readings.length === 0) { valueEl.className='msg msg-error'; valueEl.textContent='Não foi possível obter uma leitura de GPS.'; return; }
+    finishCapture();
+  }
+  watchId = navigator.geolocation.watchPosition(function(pos) {
+    readings.push(pos.coords);
+    valueEl.textContent = 'GPS: ' + readings.length + ' leituras recolhidas...';
+    if (Date.now() - startedAt >= 4000) finishCaptureOnce();
+  }, function(err) {
+    if (readings.length > 0) finishCaptureOnce();
+    else { valueEl.className='msg msg-error'; valueEl.textContent='Erro ao obter GPS: ' + err.message; if (watchId !== null) navigator.geolocation.clearWatch(watchId); }
+  }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+  setTimeout(finishCaptureOnce, 4500);
+
+  function finishCapture() {
+    var weights = readings.map(function(c) { var a = Math.max(1, Number(c.accuracy) || 9999); return 1 / (a * a); });
+    var weightSum = weights.reduce(function(s, w) { return s + w; }, 0) || readings.length;
+    var lat = readings.reduce(function(s, c, i) { return s + c.latitude * weights[i]; }, 0) / weightSum;
+    var lng = readings.reduce(function(s, c, i) { return s + c.longitude * weights[i]; }, 0) / weightSum;
+    var reportedAccuracies = readings.map(function(c) { return Number(c.accuracy) || 9999; });
+    var meanAccuracy = reportedAccuracies.reduce(function(sum, v) { return sum + v; }, 0) / reportedAccuracies.length;
+    var dispersion = 0;
+    readings.forEach(function(c) { dispersion = Math.max(dispersion, haversineMetersJS(lat, lng, c.latitude, c.longitude)); });
+    // A precisão final usa a média das leituras e a dispersão espacial, sem ser
+    // degradada artificialmente por uma única leitura atípica.
+    var accuracy = Math.max(meanAccuracy, dispersion);
+    var plusCode = encodeOLC(lat, lng);
+    campoLocation = { lat: lat, lng: lng, plusCode: plusCode, accuracy: accuracy };
+
+    valueEl.className = 'msg msg-success'; valueEl.textContent = 'GPS capturado (média de ' + readings.length + ' leituras; dispersão máx. ' + Math.round(dispersion) + ' m).';
+    campoLoadStreetsForQuadra(lat, lng);
+    document.getElementById('campo-porta-intercalada').checked = false;
+    document.getElementById('campo-infill-box').style.display = 'none';
+    campoInfillBase = null;
+    document.getElementById('campo-gps-card').style.display = 'block';
+    document.getElementById('campo-coords').textContent = lat.toFixed(5) + ', ' + lng.toFixed(5);
+    document.getElementById('campo-pluscode-value').textContent = plusCode;
+
+    var precisaoEl = document.getElementById('campo-precisao');
+    var precisaoBaixaBox = document.getElementById('campo-precisao-baixa-box');
+    if (accuracy < 5) { precisaoEl.innerHTML = '🟢 ±' + Math.round(accuracy) + ' m — Precisão excelente'; precisaoBaixaBox.style.display = 'none'; }
+    else if (accuracy < 10) { precisaoEl.innerHTML = '🟢 ±' + Math.round(accuracy) + ' m — Precisão válida'; precisaoBaixaBox.style.display = 'none'; }
+    else { precisaoEl.innerHTML = '🔴 ±' + Math.round(accuracy) + ' m — GPS inválido (necessário <10 m)'; precisaoBaixaBox.style.display = 'block'; }
+
+    document.getElementById('campo-chips').textContent = 'a identificar...';
+    document.getElementById('campo-codigo-previsto').textContent = 'a calcular...';
+
+    fetch(SUPABASE_URL + '/functions/v1/geocode?action=reverse', { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }, body: JSON.stringify({ latitude: lat, longitude: lng }) })
+      .then(function(r) { return r.json(); }).then(function(geo) {
+        var a = geo.address || {};
+        var province = a.state || a.region || a.county || null;
+        var municipality = a.city || a.town || a.municipality || null;
+        campoLocation.provinceName = province;
+        document.getElementById('campo-chips').textContent =
+          (province ? 'Província do ' + province : 'província não identificada') +
+          (municipality ? ' · Município do ' + municipality : '');
+        // Guarda a sugestão externa (mesmo serviço que já pagamos, sem custo extra) — só
+        // é usada mais abaixo se a nossa própria base não tiver nada por perto para sugerir.
+        campoLocation.sugestaoRuaExterna = a.road || null;
+        campoLocation.sugestaoBairroExterna = a.suburb || a.neighbourhood || a.quarter || a.residential || null;
+        campoTentarInjetarSugestaoExterna();
+        return fetch(SUPABASE_URL + '/functions/v1/generate-postal-code', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY },
+          body: JSON.stringify({ latitude: lat, longitude: lng, province_name: province })
+        });
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        document.getElementById('campo-codigo-previsto').textContent = data.postal_code || 'erro';
+        campoLocation.postalCodePreview = data.postal_code;
+      }).catch(function() { document.getElementById('campo-chips').textContent = 'erro ao identificar'; });
+
+    fetch(SUPABASE_URL + '/functions/v1/field-service?action=check_duplicates', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+      body: JSON.stringify({ latitude: lat, longitude: lng })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      campoDuplicate = data;
+      if (data.found) {
+        document.getElementById('campo-duplicado-box').style.display = 'block';
+        document.getElementById('campo-duplicado-info').textContent =
+          'A ' + Math.round(data.distance_meters) + ' m: ' + (data.postal_code || '(sem código)');
+      }
+      campoUpdateSubmitState();
+    }).catch(function() {
+      // Sem rede — usa a zona preparada antes (se houver) em vez de saltar a verificação
+      lerZonaOffline().then(function(zona) {
+        if (zona && zona.moradas && zona.moradas.length > 0) {
+          var maisProxima = null, menorDist = Infinity;
+          zona.moradas.forEach(function(m) {
+            var dist = haversineMetersJS(lat, lng, m.latitude, m.longitude);
+            if (dist < menorDist) { menorDist = dist; maisProxima = m; }
+          });
+          if (maisProxima && menorDist <= 15) {
+            campoDuplicate = { found: true, distance_meters: menorDist, postal_code: maisProxima.postal_code, offline: true };
+            document.getElementById('campo-duplicado-box').style.display = 'block';
+            document.getElementById('campo-duplicado-info').textContent =
+              '📴 (zona offline) A ' + Math.round(menorDist) + ' m: ' + (maisProxima.postal_code || '(sem código)');
+          }
+        }
+        campoUpdateSubmitState();
+      });
+    });
+
+    campoUpdateSubmitState();
+  }
+  readOnce();
+}
+
+document.getElementById('btn-campo-gps').addEventListener('click', campoCaptureGps);
+document.getElementById('btn-campo-recapturar').addEventListener('click', campoCaptureGps);
+
+document.getElementById('btn-duplicado-vincular').addEventListener('click', function() {
+  var accuracyOk = campoLocation && isValidGpsAccuracy(campoLocation.accuracy);
+  var bairroChoiceVinc = campoSelectedNeighborhoodChoice();
+  var bairroOkVinc = !!bairroChoiceVinc && (bairroChoiceVinc.neighborhood_name === null || (bairroChoiceVinc.neighborhood_name && bairroChoiceVinc.neighborhood_name.length > 0));
+  var fieldsOk = document.getElementById('campo-reference').value.trim() &&
+    bairroOkVinc &&
+    campoPhotoFacadeUrl;
+  if (!accuracyOk || !fieldsOk) {
+    var msg = document.getElementById('campo-msg');
+    msg.className = 'msg msg-error';
+    msg.textContent = 'Preenche os campos e a foto da fachada obrigatória antes de vincular.';
+    return;
+  }
+  document.getElementById('campo-duplicado-box').style.display = 'none';
+  campoDoSubmit();
+});
+document.getElementById('btn-duplicado-nova').addEventListener('click', function() {
+  var box = document.getElementById('campo-duplicado-justificacao');
+  box.style.display = 'block';
+  box.oninput = function() {
+    campoDuplicateOverrideReason = box.value.trim().length >= 10 ? box.value.trim() : null;
+    campoUpdateSubmitState();
+  };
+});
+
+// Redimensiona, marca de água (Plus Code + data/hora) e comprime a foto antes de enviar
+function campoSetupPhotoInput(inputId, statusId, previewId, onDone) {
+  document.getElementById(inputId).addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    var statusEl = document.getElementById(statusId);
+    var preview = document.getElementById(previewId);
+    if (!file) return;
+    if (!campoLocation) {
+      statusEl.className = 'msg msg-error'; statusEl.textContent = 'Captura o GPS antes de tirar a foto.';
+      e.target.value = ''; return;
+    }
+    statusEl.className = 'msg msg-muted'; statusEl.textContent = 'A processar a foto...';
+
+    var img = new Image();
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      img.onload = function() {
+        var maxDim = 1280;
+        var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        var w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+
+        var barHeight = Math.max(30, Math.round(h * 0.07));
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillRect(0, h - barHeight, w, barHeight);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = Math.round(barHeight * 0.32) + 'px sans-serif';
+        ctx.textBaseline = 'middle';
+        var when = new Date().toLocaleString('pt-PT');
+        ctx.fillText('📍 ' + campoLocation.plusCode + '  ·  ' + campoLocation.lat.toFixed(5) + ', ' + campoLocation.lng.toFixed(5), 10, h - barHeight * 0.68);
+        ctx.fillText(when, 10, h - barHeight * 0.28);
+
+        canvas.toBlob(function(blob) {
+          preview.src = URL.createObjectURL(blob);
+          preview.style.display = 'block';
+          statusEl.className = 'msg msg-muted';
+          statusEl.textContent = 'A enviar foto (' + Math.round(blob.size / 1024) + ' KB)...';
+
+          var fileName = campoDeviceId + '-' + inputId + '-' + Date.now();
+          uploadFotoComFallback(blob, 'field-photos', fileName).then(function(res) {
+            if (res.ok) {
+              onDone(res.url);
+              statusEl.className = 'msg msg-success';
+              statusEl.textContent = 'Foto pronta (' + Math.round(blob.size / 1024) + ' KB).';
+            } else {
+              onDone(res.marcador);
+              statusEl.className = 'msg msg-success';
+              statusEl.textContent = '📴 Sem rede — foto guardada no telemóvel, envia-se sozinha mais tarde.';
+            }
+            campoUpdateSubmitState();
+          });
+        }, 'image/jpeg', 0.65);
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+campoSetupPhotoInput('campo-photo-facade-input', 'campo-photo-facade-status', 'campo-photo-facade-preview', function(url) { campoPhotoFacadeUrl = url; });
+
+function campoResetForm() {
+  ['campo-neighborhood-new-name', 'campo-reference', 'campo-precisao-justificacao', 'campo-duplicado-justificacao', 'campo-street-new-name'].forEach(function(id) { document.getElementById(id).value = ''; });
+  document.getElementById('campo-street-select').innerHTML = '<option value="">Captura o GPS primeiro...</option>';
+  document.getElementById('campo-street-new-name').style.display = 'none';
+  document.getElementById('campo-neighborhood-select').innerHTML = '<option value="">Captura o GPS primeiro...</option>';
+  document.getElementById('campo-neighborhood-new-name').style.display = 'none';
+  document.getElementById('campo-porta-intercalada').checked = false;
+  document.getElementById('campo-infill-box').style.display = 'none';
+  campoInfillBase = null; campoQuadraCode = null;
+  document.getElementById('campo-quadra-chip').textContent = 'a calcular...';
+  campoLocation = null; campoPhotoFacadeUrl = null;
+  campoDuplicate = null; campoDuplicateOverrideReason = null;
+  document.getElementById('campo-gps-value').textContent = '';
+  document.getElementById('campo-gps-card').style.display = 'none';
+  document.getElementById('campo-duplicado-box').style.display = 'none';
+  document.getElementById('campo-duplicado-justificacao').style.display = 'none';
+  document.getElementById('campo-photo-facade-preview').style.display = 'none';
+  ['campo-photo-facade-status', 'campo-photo-facade-input'].forEach(function(id) { document.getElementById(id).value = ''; });
+  campoUpdateSubmitState();
+}
+
+function campoDoSubmit() {
+  var msg = document.getElementById('campo-msg');
+  msg.className = 'msg msg-muted'; msg.textContent = 'A enviar...';
+
+  var streetChoice = campoSelectedStreetChoice() || {};
+  var bairroChoiceEnvio = campoSelectedNeighborhoodChoice() || {};
+  var payload = {
+    device_id: campoDeviceId, latitude: campoLocation.lat, longitude: campoLocation.lng,
+    street_id: streetChoice.street_id, street_name: streetChoice.street_name, new_unnamed_street: streetChoice.new_unnamed_street,
+    neighborhood_name: bairroChoiceEnvio.neighborhood_name,
+    reference: document.getElementById('campo-reference').value.trim(),
+    photo_facade_url: campoPhotoFacadeUrl,
+    accuracy_meters: campoLocation.accuracy,
+    accuracy_justification: document.getElementById('campo-precisao-justificacao').value.trim() || null,
+    override_duplicate: !!campoDuplicateOverrideReason,
+    duplicate_justification: campoDuplicateOverrideReason,
+    infill_base_house_number: document.getElementById('campo-porta-intercalada').checked ? campoInfillBase : null
+  };
+
+  var temFotoOffline = campoPhotoFacadeUrl && campoPhotoFacadeUrl.indexOf('offline:') === 0;
+  if (!navigator.onLine || temFotoOffline) {
+    queuePendingOp('field_submit', payload);
+    msg.textContent = '';
+    document.getElementById('campo-sucesso-codigo').textContent = 'Vai ser atribuído na sincronização';
+    document.getElementById('campo-sucesso-card').style.display = 'block';
+    document.querySelector('#campo-sucesso-card .lead') && (document.querySelector('#campo-sucesso-card .lead').textContent = '📴 Guardado no telemóvel — envia-se sozinho quando a internet voltar.');
+    return;
+  }
+
+  garantirChaveAssinaturaRegistada().then(function(registo) {
+    if (!registo || !registo.keyPair || !registo.registada) throw new Error('DEVICE_REGISTRATION_FAILED');
+    return window.crypto.subtle.exportKey('jwk', registo.keyPair.publicKey).then(function(jwk) {
+      payload.public_key_jwk = jwk;
+      return fetch(SUPABASE_URL + '/functions/v1/field-service?action=submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+        body: JSON.stringify(payload)
+      });
+    });
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.error) { msg.className = 'msg msg-error'; msg.textContent = data.error; return; }
+    msg.textContent = '';
+    document.getElementById('campo-sucesso-codigo').textContent = campoLocation.postalCodePreview || '-';
+    document.getElementById('campo-sucesso-card').style.display = 'block';
+    campoLoadDailyCount();
+  }).catch(function() {
+    queuePendingOp('field_submit', payload);
+    msg.textContent = '';
+    document.getElementById('campo-sucesso-codigo').textContent = 'Vai ser atribuído na sincronização';
+    document.getElementById('campo-sucesso-card').style.display = 'block';
+  });
+}
+
+document.getElementById('btn-campo-enviar').addEventListener('click', campoDoSubmit);
+
+document.getElementById('btn-campo-proxima-porta').addEventListener('click', function() {
+  document.getElementById('campo-sucesso-card').style.display = 'none';
+  campoResetForm();
+  campoCaptureGps();
+});
+
+
+
+// ---- Validar (Supervisor/Admin) ----
+function loadValidar() {
+  if (!session) return;
+  var canValidate = ['super_admin','admin_nacional','supervisor','admin_provincial','admin_municipal'].some(function(r) { return myRoles.indexOf(r) > -1; });
+  if (!canValidate) {
+    var denied = document.getElementById('validar-list');
+    if (denied) denied.innerHTML = '<p class="msg msg-error">Não tens permissão para validar registos de Campo.</p>';
+    return;
+  }
+  var list = document.getElementById('validar-list');
+  var empty = document.getElementById('validar-empty');
+  list.innerHTML = '<p class="msg msg-muted">A carregar...</p>';
+  empty.style.display = 'none';
+
+  fetch(SUPABASE_URL + '/functions/v1/field-service?action=list_pending', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+    body: '{}'
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    var rows = data.records || [];
+    list.innerHTML = '';
+    if (rows.length === 0) { empty.style.display = 'block'; return; }
+    rows.forEach(function(rec) {
+      var div = document.createElement('div');
+      div.className = 'list-item';
+      var isDuplicate = rec.status === 'DUPLICATE';
+      var actions = isDuplicate
+        ? '<button data-id="' + rec.id + '" data-lat="' + rec.latitude + '" data-lng="' + rec.longitude + '" data-decision="merge" class="validar-btn btn btn-success-solid btn-sm">Fundir com existente</button>' +
+          '<button data-id="' + rec.id + '" data-lat="' + rec.latitude + '" data-lng="' + rec.longitude + '" data-decision="approve" class="validar-btn btn btn-secondary btn-sm">Aceitar como novo</button>' +
+          '<button data-id="' + rec.id + '" data-decision="reject" class="validar-btn btn btn-danger-outline btn-sm">Rejeitar</button>'
+        : '<button data-id="' + rec.id + '" data-lat="' + rec.latitude + '" data-lng="' + rec.longitude + '" data-decision="approve" class="validar-btn btn btn-success-solid btn-sm">Aprovar</button>' +
+          '<button data-id="' + rec.id + '" data-decision="duplicate" class="validar-btn btn btn-secondary btn-sm">Duplicado</button>' +
+          '<button data-id="' + rec.id + '" data-decision="reject" class="validar-btn btn btn-danger-outline btn-sm">Rejeitar</button>';
+      div.innerHTML =
+        (isDuplicate ? '<div style="color:var(--danger);font-size:11px;font-weight:600;margin-bottom:4px;">⚠️ POSSÍVEL DUPLICADO' + (rec.duplicate_override_reason ? ' — agente diz: "' + rec.duplicate_override_reason + '"' : '') + '</div>' : '') +
+        '<div class="value-plain">' + ((rec.streets && rec.streets.name) || '(rua não indicada)') + (rec.quadras ? ' · Quadra ' + rec.quadras.code : '') + '</div>' +
+        '<div style="font-size:11.5px;color:var(--text-dim);margin:2px 0 8px;">' + (rec.neighborhood_name || '') + ' · ' + rec.latitude.toFixed(4) + ', ' + rec.longitude.toFixed(4) + '</div>' +
+        (rec.preview_house_number != null ? '<div style="font-size:11.5px;color:var(--accent);margin-bottom:8px;">🔢 Vai ficar: nº ' + rec.preview_house_number + (rec.infill_base_house_number ? ' (porta intercalada)' : '') + '</div>' : '') +
+        (rec.watermark_match === true ? '<div style="font-size:11px;color:var(--success);margin-bottom:8px;">✅ Marca de água confere com a localização</div>' : rec.watermark_match === false ? '<div style="font-size:11px;color:var(--danger);margin-bottom:8px;">⚠️ Marca de água não confere — revê com atenção</div>' : '') +
+        '<div class="btn-row">' + actions + '</div>';
+      list.appendChild(div);
+    });
+    document.querySelectorAll('.validar-btn').forEach(function(b) {
+      b.addEventListener('click', function() {
+        var btn = b;
+        function sendValidate(extra) {
+          fetch(SUPABASE_URL + '/functions/v1/field-service?action=validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+            body: JSON.stringify(Object.assign({ field_record_id: btn.dataset.id, decision: btn.dataset.decision }, extra || {}))
+          }).then(function(r) { return r.json(); }).then(function(data) {
+            if (data.error) { alert(data.error); return; }
+            if (data.house_number != null) {
+              alert('Número da porta atribuído: ' + data.house_number + (data.postal_code ? ' · ' + data.postal_code : ''));
+            }
+            loadValidar();
+          });
+        }
+
+        if ((btn.dataset.decision === 'approve' || btn.dataset.decision === 'merge') && btn.dataset.lat) {
+          var lat = parseFloat(btn.dataset.lat), lng = parseFloat(btn.dataset.lng);
+          fetch(SUPABASE_URL + '/functions/v1/geocode?action=reverse', { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }, body: JSON.stringify({ latitude: lat, longitude: lng }) })
+            .then(function(r) { return r.json(); }).then(function(geo) {
+              var a = geo.address || {};
+              var provinceName = a.state || a.region || a.county || null;
+              var municipalityName = a.city || a.town || a.municipality || null;
+              var lookups = [
+                provinceName ? fetch(SUPABASE_URL + '/rest/v1/provinces?name=ilike.' + encodeURIComponent(provinceName) + '&select=id', { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token } }).then(function(r) { return r.json(); }) : Promise.resolve([]),
+                municipalityName ? fetch(SUPABASE_URL + '/rest/v1/municipalities?name=ilike.*' + encodeURIComponent(municipalityName) + '*&select=id,province_id', { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token } }).then(function(r) { return r.json(); }) : Promise.resolve([]),
+              ];
+              Promise.all(lookups).then(function(results) {
+                var provinceRows = results[0], muniRows = results[1];
+                sendValidate({
+                  province_id: (muniRows[0] && muniRows[0].province_id) || (provinceRows[0] && provinceRows[0].id) || null,
+                  municipality_id: (muniRows[0] && muniRows[0].id) || null,
+                  province_name: provinceName,
+                });
+              });
+            }).catch(function() { sendValidate({}); });
+        } else {
+          sendValidate({});
+        }
+      });
+    });
+  }).catch(function() { list.innerHTML = '<p class="msg msg-error">Erro ao carregar.</p>'; });
+}
+
+// ---- Gestão de quadra/ruas (PRONPET v5.14) ----
+var quadraAtualId = null, quadraAtualLat = null, quadraAtualLng = null;
+document.getElementById('btn-quadra-aqui').addEventListener('click', function() {
+  var box = document.getElementById('quadra-info-box');
+  var msg = document.getElementById('quadra-msg');
+  msg.textContent = '';
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    quadraAtualLat = pos.coords.latitude; quadraAtualLng = pos.coords.longitude;
+    fetch(SUPABASE_URL + '/functions/v1/field-service?action=list_streets_in_quadra', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+      body: JSON.stringify({ latitude: quadraAtualLat, longitude: quadraAtualLng })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      quadraAtualId = data.quadra_id;
+      box.style.display = 'block';
+      document.getElementById('quadra-info-chip').textContent = 'Quadra ' + data.quadra_code + ' · ' + data.kind + ' · ≈' + Math.round(data.area_m2) + ' m² · ' + (data.streets || []).length + ' rua(s)';
+      var streetsList = document.getElementById('quadra-streets-list');
+      streetsList.innerHTML = (data.streets || []).map(function(s) {
+        return '<div class="list-item">' +
+          '<div class="value-plain" style="font-weight:600;">' + s.name + '</div>' +
+          '<div style="font-size:11px;color:var(--text-dim);margin:2px 0 6px;">próx. nº ' + s.next_seq + ' · modo atual: ' + s.numbering_mode + '</div>' +
+          '<div class="btn-row" style="flex-wrap:wrap;gap:6px;">' +
+            '<select class="input street-mode-select" data-street="' + s.id + '" style="width:140px;">' +
+              '<option value="SEQUENCIAL"' + (s.numbering_mode === 'SEQUENCIAL' ? ' selected' : '') + '>Sequencial</option>' +
+              '<option value="METRICO"' + (s.numbering_mode === 'METRICO' ? ' selected' : '') + '>Métrico</option>' +
+            '</select>' +
+            '<button class="btn btn-secondary btn-sm street-mode-guardar" data-street="' + s.id + '">Guardar modo</button>' +
+          '</div></div>';
+      }).join('') || '<p class="msg msg-muted">Sem ruas ainda nesta quadra.</p>';
+
+      document.querySelectorAll('.street-mode-guardar').forEach(function(b) {
+        b.addEventListener('click', function() {
+          var streetId = b.dataset.street;
+          var mode = document.querySelector('.street-mode-select[data-street="' + streetId + '"]').value;
+          var payload = { street_id: streetId, numbering_mode: mode };
+          if (mode === 'METRICO') { payload.origin_lat = quadraAtualLat; payload.origin_lng = quadraAtualLng; }
+          fetch(SUPABASE_URL + '/functions/v1/field-service?action=set_street_mode', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+            body: JSON.stringify(payload)
+          }).then(function(r) { return r.json(); }).then(function(data) {
+            if (data.error) { msg.className = 'msg msg-error'; msg.textContent = data.error; return; }
+            msg.className = 'msg msg-success'; msg.textContent = 'Modo atualizado' + (mode === 'METRICO' ? ' (origem = a tua posição atual)' : '') + '.';
+          });
+        });
+      });
+    });
+  }, function() { document.getElementById('quadra-msg').className = 'msg msg-error'; document.getElementById('quadra-msg').textContent = 'Erro ao obter GPS.'; });
+});
+
+document.getElementById('btn-quadra-fechar').addEventListener('click', function() {
+  var msg = document.getElementById('quadra-msg');
+  if (!document.getElementById('quadra-fecho-confirmar').checked) {
+    msg.className = 'msg msg-error'; msg.textContent = 'Confirma primeiro a condição acima (N9 exige isso).';
+    return;
+  }
+  if (!confirm('ATENÇÃO: esta operação pode renumerar portas, congelar a quadra e afetar referências existentes.\n\nConfirmas que queres continuar?')) return;
+  var codigoFecho = prompt('Para confirmar, escreve exatamente: FECHAR QUADRA');
+  if (codigoFecho !== 'FECHAR QUADRA') { msg.className = 'msg msg-error'; msg.textContent = 'Operação cancelada: código de confirmação incorreto.'; return; }
+  msg.className = 'msg msg-muted'; msg.textContent = 'A fechar quadra...';
+  fetch(SUPABASE_URL + '/functions/v1/field-service?action=close_quadra', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+    body: JSON.stringify({ quadra_id: quadraAtualId, confirmed_plates_or_notified: true })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.error) { msg.className = 'msg msg-error'; msg.textContent = data.error; return; }
+    msg.className = 'msg msg-success';
+    msg.textContent = data.streets_closed + ' rua(s) fechada(s), ' + data.doors_renumbered + ' porta(s) renumerada(s).';
+    document.getElementById('btn-quadra-aqui').click();
+  }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
+});
+</script>
+<script>
+(function () {
+  'use strict';
+
+  // ===== V10 — reforços de robustez/UX aplicados sobre a v9 =====
+  var GPS_TIMEOUT_MS = 15000;
+  var GPS_HARD_MAX_ACCURACY = 10;
+  var NEARBY_ADDRESS_METERS = 20;
+  var pinCountdownTimer = null;
+
+  window.AL_V10 = window.AL_V10 || {};
+  window.AL_V10.validateGPSPrecision = function (accuracy) {
+    accuracy = Number(accuracy);
+    if (!isFinite(accuracy)) return { valid:false, message:'Precisão GPS indisponível.' };
+    if (accuracy >= GPS_HARD_MAX_ACCURACY) return { valid:false, message:'Precisão de ' + Math.round(accuracy) + ' m insuficiente. É necessário menos de 10 m.' };
+    return { valid:true };
+  };
+
+  window.AL_V10.getLocationWithTimeout = function () {
+    return new Promise(function (resolve, reject) {
+      if (!navigator.geolocation) { reject(new Error('GPS_UNAVAILABLE')); return; }
+      var done = false;
+      var timer = setTimeout(function () { if (!done) { done = true; reject(new Error('GPS_TIMEOUT')); } }, GPS_TIMEOUT_MS);
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        if (done) return; done = true; clearTimeout(timer);
+        resolve(pos);
+      }, function (err) {
+        if (done) return; done = true; clearTimeout(timer); reject(err || new Error('GPS_ERROR'));
+      }, { enableHighAccuracy:true, timeout:GPS_TIMEOUT_MS, maximumAge:0 });
+    });
+  };
+
+  window.AL_V10.generateMapsQRData = function (lat, lng, plusCode) {
+    var gmaps = 'https://maps.google.com/?q=' + Number(lat) + ',' + Number(lng);
+    return JSON.stringify({ google_maps:gmaps, plus_code:plusCode || null, latitude:Number(lat), longitude:Number(lng) });
+  };
+
+  function setText(id, text) { var el=document.getElementById(id); if(el) el.textContent=text; }
+
+  // 3.x — Ruas/bairros sem nome e descrição contextual.
+  function wireCitizenAddressContext() {
+    var rua=document.getElementById('registar-local-rua');
+    var bairro=document.getElementById('registar-local-bairro');
+    var bairroNome=document.getElementById('registar-local-bairro-novo');
+    var bairroDesc=document.getElementById('registar-local-bairro-descricao');
+    var ref=document.getElementById('registar-local-referencia');
+    var hint=document.getElementById('registar-local-referencia-hint');
+    if (!rua || !bairro) return;
+
+    function update() {
+      var noRua = rua.value === '__no_name__' || rua.value === '__offline__';
+      var noBairro = bairro.value === '__new_unnamed__';
+      if (bairroNome) bairroNome.style.display = bairro.value === '__new_named__' ? 'block' : 'none';
+      if (bairroDesc) bairroDesc.style.display = noBairro ? 'block' : 'none';
+      if (hint) {
+        hint.textContent = noRua ? '⚠️ Rua sem nome: a referência é obrigatória (mín. 5 caracteres).' : 'Em rua sem nome, esta referência torna-se obrigatória.';
+        hint.style.color = noRua ? 'var(--danger)' : 'var(--text-dim)';
+      }
+      if (ref) ref.required = noRua;
+    }
+    rua.addEventListener('change', update); bairro.addEventListener('change', update); update();
+  }
+
+  // 3.5 — explicita o raio usado para detecção de duplicados sem alterar o backend.
+  window.AL_V10.NEARBY_THRESHOLD_METERS = NEARBY_ADDRESS_METERS;
+
+  // 1.4 — validação rigorosa do 2FA.
+  function wireMFAValidation() {
+    ['mfa-login-code','mfa-forced-code'].forEach(function(id) {
+      var input=document.getElementById(id); if(!input) return;
+      input.setAttribute('inputmode','numeric'); input.setAttribute('maxlength','6');
+      input.addEventListener('input', function(){ input.value=input.value.replace(/\D/g,'').slice(0,6); });
+    });
+    var login=document.getElementById('btn-mfa-login-verify');
+    if(login) login.addEventListener('click', function(e){
+      var input=document.getElementById('mfa-login-code');
+      if(input && !/^\d{6}$/.test(input.value.trim())) { e.stopImmediatePropagation(); setText('mfa-login-msg','O código deve ter exatamente 6 dígitos numéricos.'); var m=document.getElementById('mfa-login-msg'); if(m)m.className='msg msg-error'; }
+    }, true);
+    var forced=document.getElementById('btn-mfa-forced-verify');
+    if(forced) forced.addEventListener('click', function(e){
+      var input=document.getElementById('mfa-forced-code');
+      if(input && !/^\d{6}$/.test(input.value.trim())) { e.stopImmediatePropagation(); setText('mfa-forced-msg','O código deve ter exatamente 6 dígitos numéricos.'); var m=document.getElementById('mfa-forced-msg'); if(m)m.className='msg msg-error'; }
+    }, true);
+  }
+
+  // 1.5 — bloqueio visual + funcional durante revisão KYC.
+  window.AL_V10.applyIdentityRestrictions = function (pending) {
+    var ids=['tab-btn-guardados','tab-btn-entrega','tab-btn-minhas-entregas','tab-btn-campo','tab-btn-validar','tab-btn-admin'];
+    ids.forEach(function(id){ var b=document.getElementById(id); if(!b)return; if(pending){ b.classList.add('al-locked'); b.setAttribute('aria-disabled','true'); b.dataset.kycLocked='1'; b.title='Disponível após verificação de identidade (até 24h)'; } else { b.classList.remove('al-locked'); b.removeAttribute('aria-disabled'); b.removeAttribute('data-kyc-locked'); b.title=''; }});
+  };
+  document.addEventListener('click', function(e){ var b=e.target.closest && e.target.closest('.al-tab[data-kyc-locked="1"]'); if(b){e.preventDefault();e.stopPropagation();alert('🔒 Esta secção fica disponível depois da verificação da identidade.');}}, true);
+
+  // 2.3 — fallback explícito quando reverse geocoding não encontra divisão.
+  window.AL_V10.formatAdministrativeDivision = function (data) {
+    data=data||{}; var parts=[data.municipality,data.commune,data.bairro,data.province].filter(Boolean);
+    return parts.length ? parts.join(' → ') : 'Não identificada (zona rural/remota)';
+  };
+
+  // 4.3/4.4 — PIN copiável, WhatsApp e countdown.
+  window.AL_V10.startPINCountdown = function(expiresAt){
+    if(pinCountdownTimer) clearInterval(pinCountdownTimer);
+    var el=document.getElementById('pin-countdown'); if(!el || !expiresAt) return;
+    function tick(){
+      var ms=new Date(expiresAt).getTime()-Date.now();
+      if(!isFinite(ms)){el.textContent='Válido por 72h.';return;}
+      if(ms<=0){el.textContent='⚠️ PIN EXPIRADO';el.classList.add('al-countdown-warning');clearInterval(pinCountdownTimer);return;}
+      var h=Math.floor(ms/3600000), m=Math.floor((ms%3600000)/60000); el.textContent='Expira em: '+h+'h '+m+'min';
+      if(ms<6*3600000) el.classList.add('al-countdown-warning');
+    }
+    tick(); pinCountdownTimer=setInterval(tick,60000);
+  };
+
+  function wireDeliverySharing(){
+    var copy=document.getElementById('btn-copiar-pin');
+    if(copy) copy.addEventListener('click',function(){ var pin=(document.getElementById('delivery-pin')||{}).textContent||''; if(navigator.clipboard) navigator.clipboard.writeText(pin.trim()).then(function(){setText('entrega-share-msg','PIN copiado.');}); });
+    var wa=document.getElementById('btn-whatsapp-pin');
+    if(wa) wa.addEventListener('click',function(){
+      var pin=(document.getElementById('delivery-pin')||{}).textContent||'';
+      var track=(document.getElementById('tracking-code')||{}).textContent||'';
+      var phone=(document.getElementById('entrega-contacto')||{}).value||'';
+      var digits=phone.replace(/\D/g,''); if(digits.length===9) digits='244'+digits;
+      var text='📦 Angola Localiza\nCódigo de rastreio: '+track.trim()+'\nPIN de confirmação: '+pin.trim();
+      var url='https://wa.me/'+(digits||'')+'?text='+encodeURIComponent(text);
+      if(!digits) url='https://wa.me/?text='+encodeURIComponent(text);
+      window.open(url,'_blank','noopener');
+    });
+  }
+
+
+  // 5.3 — estado não mapeado para quadra, sem bloquear o levantamento.
+  window.AL_V10.provisionalQuadraMessage = function(){ return 'Zona sem quadra definida. O supervisor poderá atribuir/criar a quadra na aprovação.'; };
+
+  // 5.7/5.9 — suporte operacional no texto do campo, sem fingir que existe sticker.
+  var campoGpsValue=document.getElementById('campo-gps-value');
+  if(campoGpsValue){
+    var observer=new MutationObserver(function(){
+      if(campoGpsValue.textContent && /leitura|leituras/i.test(campoGpsValue.textContent)) campoGpsValue.title='As 3 leituras são recolhidas em sequência e comparadas quanto à dispersão.';
+    }); observer.observe(campoGpsValue,{childList:true,subtree:true,characterData:true});
+  }
+
+  // 6.6 — validação local do CSV antes de enviar à API.
+  window.AL_V10.validateAngolanCoordinates = function(lat,lng){
+    lat=Number(lat); lng=Number(lng);
+    return isFinite(lat)&&isFinite(lng)&&lat>=-18&&lat<=-4.4&&lng>=11.6&&lng<=24.1;
+  };
+  var importBtn=document.getElementById('btn-import');
+  if(importBtn) importBtn.addEventListener('click',function(e){
+    var input=document.getElementById('import-file'), msg=document.getElementById('import-msg'); if(!input||!input.files[0])return;
+    // Validação prévia do conteúdo não substitui a validação do servidor.
+    var reader=new FileReader(); reader.onload=function(){
+      var lines=String(reader.result||'').split(/\r?\n/).filter(Boolean), invalid=0;
+      if(lines.length>1){ for(var i=1;i<lines.length;i++){ var c=lines[i].split(','); if(c.length>=2 && !window.AL_V10.validateAngolanCoordinates(c[0],c[1])) invalid++; }}
+      if(invalid){ msg.className='msg msg-error'; msg.textContent=invalid+' linha(s) têm coordenadas fora dos limites de Angola. Corrige o CSV antes de importar.'; }
+    }; reader.readAsText(input.files[0]);
+  }, true);
+
+  // 8.1 — estimativa simples do tamanho da zona offline.
+  window.AL_V10.estimateOfflineSize = function(count){ return Math.round((Number(count)||0)*15*1024); };
+  var offlineStatus=document.getElementById('zona-offline-status');
+  if(offlineStatus){
+    var oldObserver=new MutationObserver(function(){ var t=offlineStatus.textContent||''; var m=t.match(/(\d+) morada/); if(m){ var kb=Math.round(window.AL_V10.estimateOfflineSize(m[1])/1024); offlineStatus.title='Estimativa de dados de moradas: ~'+kb+' KB (tiles do mapa podem ocupar espaço adicional).'; }}); oldObserver.observe(offlineStatus,{childList:true,subtree:true,characterData:true});
+  }
+
+  // 9.4 — partilha rápida de rastreio.
+  window.AL_V10.shareTrackingWhatsApp=function(trackingCode,phone){
+    var digits=String(phone||'').replace(/\D/g,''); if(digits.length===9)digits='244'+digits;
+    var text='📦 Angola Localiza\nRastreio: '+trackingCode+'\nVer em: '+location.origin+location.pathname+'?rastreio='+encodeURIComponent(trackingCode);
+    window.open('https://wa.me/'+(digits||'')+'?text='+encodeURIComponent(text),'_blank','noopener');
+  };
+
+  // 7.2 — passos do vídeo de verificação, apresentados no formulário.
+  var passos=document.getElementById('kyc-passos');
+  if(passos && !document.getElementById('al-kyc-video-steps')){
+    var box=document.createElement('div'); box.id='al-kyc-video-steps'; box.className='msg msg-muted'; box.style.marginBottom='10px';
+    box.innerHTML='<b>🎥 Vídeo de verificação — 3 passos</b><br>1. Olha para a câmara e mantém o rosto centrado.<br>2. Vira lentamente a cabeça para a esquerda e direita.<br>3. Pisca duas vezes e mantém uma expressão natural.';
+    passos.insertBefore(box,passos.firstChild);
+  }
+
+  wireCitizenAddressContext();
+  wireMFAValidation();
+  wireDeliverySharing();
+})();
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('sw.js?v=20260926-9')
+        .then(function(reg) { reg.update(); console.log('Motor offline (PWA) ativado com sucesso!'); })
+        .catch(function(err) { console.error('Erro ao ativar o PWA:', err); });
+    });
+    // Não recarregar automaticamente quando o Service Worker muda de controlador.
+    // O reload automático interrompia formulários e podia criar ciclos de atualização.
+  }
+</script>
+<script>
+(function(){
+  // Atualização nunca deve recarregar a página automaticamente.
+  // A versão é informativa; o utilizador decide quando atualizar.
+  var build=document.querySelector('meta[name="al-build-id"]');
+  if(build) {
+    try { localStorage.setItem('al-last-build', build.getAttribute('content') || ''); } catch(e){}
+  }
+})();
+</script>
+
+</body>
+</html>
