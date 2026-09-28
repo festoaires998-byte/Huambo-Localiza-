@@ -3132,19 +3132,52 @@ function mpLoadOrders(){
     var pr=document.getElementById('mp-proposals');pr.innerHTML='';(a[2].proposals||[]).forEach(function(x){var d=document.createElement('div');d.className='list-item';d.innerHTML='<b>'+mpEsc(x.status)+'</b><div>'+mpEsc(x.message)+'</div><div>'+mpMoney(x.amount,x.currency)+'</div>';pr.appendChild(d);});
   }).catch(function(e){orders.innerHTML='<p class="msg msg-error">'+mpEsc(e.message)+'</p>';});
 }
-function mpPublish(){
-  var title=document.getElementById('mp-pub-title').value.trim(),description=document.getElementById('mp-pub-description').value.trim(),category=document.getElementById('mp-pub-category').value.trim();
-  if(!title||!description||!category){mpSetMsg('Título, descrição e categoria são obrigatórios.',false);return;}
-  var raw=document.getElementById('mp-pub-price').value.trim(),price=raw===''?null:Number(raw.replace(',','.'));if(price!==null&&(!Number.isFinite(price)||price<0)){mpSetMsg('Preço inválido.',false);return;}
-  var btn=document.getElementById('mp-pub-submit');btn.disabled=true;btn.textContent='A publicar...';
-  mpCall('create',{title:title,description:description,category:category,price:price,condition:document.getElementById('mp-pub-condition').value,province:document.getElementById('mp-pub-province').value.trim()||null,city:document.getElementById('mp-pub-city').value.trim()||null,neighborhood:document.getElementById('mp-pub-neighborhood').value.trim()||null,contact_message:true})
-  .then(function(r){
-    var files=Array.prototype.slice.call(document.getElementById('mp-pub-images').files||[]).slice(0,10),chain=Promise.resolve();
-    files.forEach(function(file,i){chain=chain.then(function(){var ext=(file.name.split('.').pop()||'jpg').toLowerCase();if(['jpg','jpeg','png','webp'].indexOf(ext)<0)throw new Error('FORMATO_IMAGEM_NAO_SUPORTADO');return mpCall('image-upload-url',{listing_id:r.listing.id,extension:ext}).then(function(u){return fetch(SUPABASE_URL+'/storage/v1/object/upload/sign/'+u.path,{method:'PUT',headers:{'Content-Type':file.type||'image/jpeg','x-upsert':'false'},body:file}).then(function(resp){if(!resp.ok)throw new Error('UPLOAD_IMAGEM_FALHOU');return mpCall('register-image',{listing_id:r.listing.id,storage_path:u.path,sort_order:i});});});});
-    return chain.then(function(){return mpCall('publish',{listing_id:r.listing.id});});
-  }).then(function(){mpSetMsg('Anúncio publicado com sucesso.',true);document.getElementById('mp-pub-title').value='';document.getElementById('mp-pub-description').value='';document.getElementById('mp-pub-price').value='';document.getElementById('mp-pub-images').value='';mpShowTab('meus');})
-  .catch(function(e){mpSetMsg(e.message,false);}).finally(function(){btn.disabled=false;btn.textContent='Publicar anúncio';});
+function mpUploadImage(listingId,file,sortOrder){
+  var ext=(file.name.split('.').pop()||'jpg').toLowerCase();
+  if(['jpg','jpeg','png','webp'].indexOf(ext)<0)return Promise.reject(new Error('FORMATO_IMAGEM_NAO_SUPORTADO'));
+  return mpCall('image-upload-url',{listing_id:listingId,extension:ext}).then(function(u){
+    if(!window.supabase||!window.supabase.createClient)throw new Error('SUPABASE_WEB_INDISPONIVEL');
+    var sb=window.supabase.createClient(SUPABASE_URL,ANON_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+    return sb.storage.from('marketplace-media').uploadToSignedUrl(u.path,u.token,file,{contentType:file.type||'image/jpeg'}).then(function(res){
+      if(res.error)throw res.error;
+      return mpCall('register-image',{listing_id:listingId,storage_path:u.path,sort_order:sortOrder});
+    });
+  });
 }
+function mpPublish(){
+  var title=document.getElementById('mp-pub-title').value.trim();
+  var description=document.getElementById('mp-pub-description').value.trim();
+  var category=document.getElementById('mp-pub-category').value.trim();
+  if(!title||!description||!category){mpSetMsg('Título, descrição e categoria são obrigatórios.',false);return;}
+  var raw=document.getElementById('mp-pub-price').value.trim();
+  var price=raw===''?null:Number(raw.replace(',','.'));
+  if(price!==null&&(!Number.isFinite(price)||price<0)){mpSetMsg('Preço inválido.',false);return;}
+  var btn=document.getElementById('mp-pub-submit');
+  btn.disabled=true;btn.textContent='A publicar...';
+  var body={
+    title:title,description:description,category:category,price:price,
+    condition:document.getElementById('mp-pub-condition').value,
+    province:document.getElementById('mp-pub-province').value.trim()||null,
+    city:document.getElementById('mp-pub-city').value.trim()||null,
+    neighborhood:document.getElementById('mp-pub-neighborhood').value.trim()||null,
+    contact_message:true
+  };
+  mpCall('create',body).then(function(r){
+    var files=Array.prototype.slice.call(document.getElementById('mp-pub-images').files||[]).slice(0,10);
+    var chain=Promise.resolve();
+    files.forEach(function(file,i){chain=chain.then(function(){return mpUploadImage(r.listing.id,file,i);});});
+    return chain.then(function(){return mpCall('publish',{listing_id:r.listing.id});});
+  }).then(function(){
+    mpSetMsg('Anúncio publicado com sucesso.',true);
+    document.getElementById('mp-pub-title').value='';
+    document.getElementById('mp-pub-description').value='';
+    document.getElementById('mp-pub-price').value='';
+    document.getElementById('mp-pub-images').value='';
+    mpShowTab('meus');
+  }).catch(function(e){mpSetMsg(e.message||'Não foi possível publicar o anúncio.',false);})
+  .finally(function(){btn.disabled=false;btn.textContent='Publicar anúncio';});
+}
+
 function mpInit(){
   document.querySelectorAll('.marketplace-main-tab').forEach(function(b){b.onclick=function(){mpShowTab(b.dataset.mpTab);};});
   document.getElementById('mp-search-btn').onclick=mpLoadListings;
