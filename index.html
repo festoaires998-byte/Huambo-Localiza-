@@ -3,21 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <script>
-/* Web cache recovery: remove versões antigas do PWA antes do bootstrap. */
+/* Runtime recovery: remove versões antigas do PWA antes do bootstrap.
+   Uma única recarga garante que uma página ainda controlada pelo SW antigo
+   volte a ser servida sem o worker legado. */
 (function(){
+  var KEY='al-runtime-recovery-20260928';
   try{
-    if('serviceWorker' in navigator){
-      navigator.serviceWorker.getRegistrations().then(function(regs){
-        regs.forEach(function(reg){ reg.unregister().catch(function(){}); });
-      }).catch(function(){});
-    }
-    if('caches' in window){
-      caches.keys().then(function(keys){
-        keys.forEach(function(key){
-          if(/^angola-localiza-/i.test(key)) caches.delete(key).catch(function(){});
-        });
-      }).catch(function(){});
-    }
+    var regsPromise=('serviceWorker' in navigator)?navigator.serviceWorker.getRegistrations():Promise.resolve([]);
+    regsPromise.then(function(regs){
+      var had=regs&&regs.length>0;
+      var jobs=(regs||[]).map(function(reg){return reg.unregister().catch(function(){return false;});});
+      return Promise.all(jobs).then(function(){
+        if(had && !sessionStorage.getItem(KEY)){
+          sessionStorage.setItem(KEY,'1');
+          return caches.keys().then(function(keys){
+            return Promise.all(keys.map(function(k){return caches.delete(k).catch(function(){});}));
+          }).catch(function(){}).then(function(){ location.reload(); });
+        }
+      });
+    }).catch(function(){});
   }catch(_){}
 })();
 </script><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -227,11 +231,11 @@
   .panel { display: none; padding: var(--sp-4) var(--sp-4) var(--sp-5); }
   .panel.visible { display: block; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 </style>
-  <meta name="al-build-id" content="20260928-230000">
+  <meta name="al-build-id" content="20260928-230500">
 </head>
 <body>
 <script>
-var APP_BUILD_ID = "20260926-101500";
+var APP_BUILD_ID = "20260928-230500";
 (function verificarVersaoPublicada(){
   var aviso=null, checking=false;
   function check(){
