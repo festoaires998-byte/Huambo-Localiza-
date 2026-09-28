@@ -123,6 +123,32 @@
     color: var(--text);
     font-size: 14.5px;
   }
+  /* Selects de Guardados: usar o menu nativo do sistema, incluindo Android WebView. */
+  select.native-menulist {
+    appearance: menulist !important;
+    -webkit-appearance: menulist !important;
+    -moz-appearance: menulist !important;
+    display: block;
+    position: relative;
+    z-index: 50;
+    background: var(--surface-2) !important;
+    background-color: var(--surface-2) !important;
+    color: var(--text) !important;
+    color-scheme: dark;
+    opacity: 1 !important;
+    text-align: left;
+  }
+  select.native-menulist option {
+    background: var(--surface-2) !important;
+    background-color: var(--surface-2) !important;
+    color: var(--text) !important;
+    font-size: 14.5px;
+    opacity: 1;
+  }
+  select.native-menulist option:checked {
+    background-color: var(--accent) !important;
+    color: #fff !important;
+  }
 
   textarea.input { height: auto; min-height: 76px; padding: var(--sp-3) var(--sp-4); resize: vertical; }
 
@@ -618,7 +644,7 @@ var APP_BUILD_ID = "20260926-101500";
             <button class="entrega-ponto-modo-btn" data-ponto="origem" data-modo="codigo">🔢 Código</button>
             <button class="entrega-ponto-modo-btn" data-ponto="origem" data-modo="qr">📷 QR</button>
           </div>
-          <select id="entrega-origem-select" class="input" style="display:none;"><option value="">Escolhe um local guardado...</option></select>
+          <select id="entrega-origem-select" class="input native-menulist" style="display:none;"><option value="">Escolhe um local guardado...</option></select>
           <div id="entrega-origem-codigo-box" style="display:none;">
             <input id="entrega-origem-codigo-input" class="input" type="text" placeholder="Código postal, Plus Code, AO-..., ou cola o link" />
             <button id="btn-resolver-origem-codigo" class="btn btn-secondary btn-sm" style="margin-top:6px;">Procurar</button>
@@ -644,7 +670,7 @@ var APP_BUILD_ID = "20260926-101500";
             <button class="entrega-ponto-modo-btn" data-ponto="destino" data-modo="qr">📷 QR</button>
             <button class="entrega-ponto-modo-btn" data-ponto="destino" data-modo="mapa">🗺️ Mapa</button>
           </div>
-          <select id="entrega-destino" class="input"><option value="">A carregar locais guardados...</option></select>
+          <select id="entrega-destino" class="input native-menulist"><option value="">A carregar locais guardados...</option></select>
           <div id="entrega-destino-codigo-box" style="display:none;">
             <input id="entrega-destino-codigo-input" class="input" type="text" placeholder="Código postal, Plus Code, AO-..., ou cola o link" />
             <button id="btn-resolver-codigo" class="btn btn-secondary btn-sm" style="margin-top:6px;">Procurar</button>
@@ -3624,16 +3650,29 @@ function loadEntregaDestinos() {
     headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
   }).then(function(r) { return r.json(); }).then(function(rows) {
     entregaDestinosCache = {}; entregaOrigensCache = {};
-    var opts = '<option value="">Escolhe um local guardado...</option>';
+    entregaDestinosCache = {}; entregaOrigensCache = {};
+    var selects = [sel, document.getElementById('entrega-origem-select')];
+    selects.forEach(function(s) {
+      if (!s) return;
+      s.innerHTML = '';
+      var first = document.createElement('option');
+      first.value = '';
+      first.textContent = (rows || []).length ? 'Escolhe um local guardado...' : 'Sem locais guardados — podes usar um código';
+      s.appendChild(first);
+    });
     (rows || []).forEach(function(f) {
       var addr = f.addresses || {};
       entregaDestinosCache[f.address_id] = addr;
       entregaOrigensCache[f.address_id] = addr;
       var label = (addr.postal_code || addr.plus_code || 'sem código') + (addr.reference ? ' — ' + addr.reference : '');
-      opts += '<option value="' + f.address_id + '">' + label + '</option>';
+      selects.forEach(function(s) {
+        if (!s) return;
+        var opt = document.createElement('option');
+        opt.value = String(f.address_id);
+        opt.textContent = label;
+        s.appendChild(opt);
+      });
     });
-    if ((rows || []).length === 0) opts = '<option value="">Sem locais guardados — podes usar um código</option>';
-    sel.innerHTML = opts;
     entregaUpdateOfflineMini();
     entregaSetOrigem({}, 'gps');
   }).catch(function() { sel.innerHTML = '<option value="">Erro ao carregar</option>'; });
