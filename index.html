@@ -1816,24 +1816,29 @@ var signupCountriesLoaded = false;
 
 function carregarPaisesSignup() {
   if (!inputCountry || signupCountriesLoaded) return;
-  fetch(SUPABASE_URL + '/rest/v1/country_configs?select=country_code,native_name,name&enabled=eq.true&order=native_name.asc', {
-    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY }
-  }).then(function(r) { return r.json(); }).then(function(rows) {
-    var countries = Array.isArray(rows) ? rows : [];
+  var fallbackCountries = [
+    { country_code: 'AO', native_name: 'Angola' },
+    { country_code: 'CV', native_name: 'Cabo Verde' },
+    { country_code: 'GW', native_name: 'Guiné-Bissau' },
+    { country_code: 'MZ', native_name: 'Moçambique' },
+    { country_code: 'ST', native_name: 'São Tomé e Príncipe' }
+  ];
+  function preencherPaises(countries) {
+    countries = Array.isArray(countries) && countries.length ? countries : fallbackCountries;
     inputCountry.innerHTML = '<option value="">Seleciona o país</option>' +
       countries.map(function(c) {
         return '<option value="' + String(c.country_code).replace(/"/g, '&quot;') + '">' +
           String(c.native_name || c.name || c.country_code).replace(/</g, '&lt;') + '</option>';
       }).join('');
     signupCountriesLoaded = true;
-  }).catch(function() {
-    inputCountry.innerHTML =
-      '<option value="">Seleciona o país</option>' +
-      '<option value="AO">Angola</option>' +
-      '<option value="CV">Cabo Verde</option>' +
-      '<option value="GW">Guiné-Bissau</option>' +
-      '<option value="MZ">Moçambique</option>' +
-      '<option value="ST">São Tomé e Príncipe</option>';
+  }
+  fetch(SUPABASE_URL + '/rest/v1/country_configs?select=country_code,native_name,name&enabled=eq.true&order=native_name.asc', {
+    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY }
+  }).then(function(r) {
+    if (!r.ok) throw new Error('country_configs indisponível');
+    return r.json();
+  }).then(preencherPaises).catch(function() {
+    preencherPaises(fallbackCountries);
   });
 }
 
