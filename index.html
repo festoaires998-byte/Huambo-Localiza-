@@ -2222,7 +2222,7 @@ function parseJwt(token) {
 var myRoles = [];
 function computeAllowedTabs() {
   if (myRoles.indexOf('super_admin') > -1) {
-    return ['mapa', 'guardados', 'entrega', 'minhas-entregas', 'marketplace', 'campo', 'validar', 'admin', 'definicoes'];
+    return ['mapa', 'guardados', 'entrega', 'minhas-entregas', 'campo', 'validar', 'admin', 'definicoes'];
   }
   var allowed = { mapa: true, definicoes: true };
   if (myRoles.length === 0) {
@@ -2231,17 +2231,17 @@ function computeAllowedTabs() {
   }
   myRoles.forEach(function(r) {
     if (r === 'tecnico_campo') { allowed.campo = true; allowed.guardados = true; }
-    if (r === 'estafeta') { allowed['minhas-entregas'] = true; allowed.marketplace = true; }
+    if (r === 'estafeta') { allowed['minhas-entregas'] = true; }
     if (r === 'operador_postal') { allowed['minhas-entregas'] = true; }
     if (r === 'supervisor') { allowed.validar = true; allowed.guardados = true; }
-    if (['admin_municipal', 'admin_provincial', 'admin_nacional'].indexOf(r) > -1) { allowed.validar = true; allowed.admin = true; allowed.marketplace = true; }
+    if (['admin_municipal', 'admin_provincial', 'admin_nacional'].indexOf(r) > -1) { allowed.validar = true; allowed.admin = true; }
     if (r === 'auditor') { allowed.admin = true; }
   });
   return Object.keys(allowed);
 }
 
 function applyNavVisibility(allowedTabs) {
-  ['mapa', 'guardados', 'entrega', 'minhas-entregas', 'marketplace', 'campo', 'validar', 'admin', 'definicoes'].forEach(function(t) {
+  ['mapa', 'guardados', 'entrega', 'minhas-entregas', 'campo', 'validar', 'admin', 'definicoes'].forEach(function(t) {
     var btn = document.getElementById('tab-btn-' + t);
     if (!btn) return;
     var show = allowedTabs.indexOf(t) > -1;
