@@ -805,28 +805,104 @@ var APP_BUILD_ID = "20260926-101500";
 
     <div id="panel-marketplace" class="panel">
       <div class="card" style="margin-bottom:var(--sp-4);">
-        <div class="label-caps">Marketplace de entregas</div>
-        <div class="value-plain" style="margin-top:4px;">Operação de estafetas — Angola</div>
+        <div class="label-caps">Marketplace Localiza</div>
+        <div class="value-plain" style="margin-top:4px;">Comprar, vender, contratar serviços e encontrar profissionais</div>
         <p id="marketplace-role-msg" class="msg msg-muted" style="text-align:left;margin-top:6px;">A carregar...</p>
       </div>
-      <div id="marketplace-management" style="display:none;">
-        <p class="lead" style="margin-bottom:var(--sp-3);">Entregas disponíveis para atribuição</p>
-        <div id="marketplace-unassigned-list" class="stack-sm"></div>
-        <div id="marketplace-unassigned-empty" class="empty-state" style="display:none;padding:10px 0;">
-          <div class="desc" style="margin:0;">Não existem entregas por atribuir neste momento.</div>
+
+      <div class="segmented" style="margin-bottom:var(--sp-3);">
+        <button class="marketplace-main-tab active" data-mp-tab="descobrir">🔎 Descobrir</button>
+        <button class="marketplace-main-tab" data-mp-tab="servicos">🧑‍🔧 Serviços</button>
+        <button class="marketplace-main-tab" data-mp-tab="favoritos">⭐ Favoritos</button>
+        <button class="marketplace-main-tab" data-mp-tab="meus">📋 Meus</button>
+        <button class="marketplace-main-tab" data-mp-tab="publicar">➕ Publicar</button>
+        <button class="marketplace-main-tab" data-mp-tab="pedidos">📦 Pedidos</button>
+      </div>
+
+      <div id="marketplace-feedback" class="msg" style="margin-bottom:var(--sp-3);"></div>
+
+      <div id="marketplace-tab-descobrir" class="marketplace-tab">
+        <div class="card">
+          <div class="field"><label>Pesquisar</label><input id="mp-search" class="input" placeholder="O que procuras?" /></div>
+          <div class="field"><label>Categoria</label><input id="mp-category" class="input" placeholder="Ex.: veículos, eletrónica..." /></div>
+          <button id="mp-search-btn" class="btn btn-primary">🔎 Pesquisar</button>
         </div>
-        <p class="lead" style="margin:var(--sp-5) 0 var(--sp-3);">Estafetas registados</p>
-        <div id="marketplace-estafetas-list" class="stack-sm"></div>
-        <div id="marketplace-estafetas-empty" class="empty-state" style="display:none;padding:10px 0;">
-          <div class="desc" style="margin:0;">Ainda não existem estafetas registados.</div>
+        <div id="mp-listings" class="stack-sm" style="margin-top:var(--sp-3);"></div>
+        <div id="mp-listings-empty" class="empty-state" style="display:none;"><div class="desc" style="margin:0;">Ainda não existem anúncios publicados neste país.</div></div>
+      </div>
+
+      <div id="marketplace-tab-servicos" class="marketplace-tab" style="display:none;">
+        <div class="card">
+          <div class="field"><label>Pesquisar profissional/empresa</label><input id="mp-service-search" class="input" placeholder="Eletricista, fotógrafo, oficina..." /></div>
+          <div class="field"><label>Categoria</label><input id="mp-service-category" class="input" placeholder="Ex.: eletricidade" /></div>
+          <div class="segmented">
+            <button class="mp-provider-filter active" data-provider="">Todos</button>
+            <button class="mp-provider-filter" data-provider="FREELANCER">Freelancers</button>
+            <button class="mp-provider-filter" data-provider="BUSINESS">Empresas</button>
+          </div>
+          <button id="mp-service-search-btn" class="btn btn-primary">🔎 Procurar serviços</button>
+          <button id="mp-service-request-btn" class="btn btn-secondary" style="margin-top:6px;">📣 Preciso de um serviço</button>
+        </div>
+        <div id="mp-service-request-box" class="card" style="display:none;margin-top:var(--sp-3);">
+          <div class="lead">Novo pedido de serviço</div>
+          <div class="field"><label>Título</label><input id="mp-request-title" class="input" placeholder="Ex.: Preciso de um eletricista" /></div>
+          <div class="field"><label>Descrição</label><textarea id="mp-request-description" class="input" placeholder="Explica o que precisas, local e detalhes..."></textarea></div>
+          <div class="field"><label>Categoria</label><input id="mp-request-category" class="input" placeholder="Ex.: eletricidade" /></div>
+          <div class="field"><label>Orçamento máximo (opcional)</label><input id="mp-request-budget" class="input" inputmode="decimal" placeholder="Valor na moeda local" /></div>
+          <div class="field"><label>Data pretendida (opcional)</label><input id="mp-request-date" class="input" type="date" /></div>
+          <button id="mp-request-submit" class="btn btn-primary">Publicar pedido</button>
+          <button id="mp-request-cancel" class="btn btn-secondary" style="margin-top:6px;">Cancelar</button>
+        </div>
+        <div id="mp-providers" class="stack-sm" style="margin-top:var(--sp-3);"></div>
+      </div>
+
+      <div id="marketplace-tab-favoritos" class="marketplace-tab" style="display:none;">
+        <div id="mp-favorites" class="stack-sm"></div>
+        <div id="mp-favorites-empty" class="empty-state" style="display:none;"><div class="desc" style="margin:0;">Ainda não guardaste anúncios favoritos.</div></div>
+      </div>
+
+      <div id="marketplace-tab-meus" class="marketplace-tab" style="display:none;">
+        <div id="mp-mine" class="stack-sm"></div>
+        <div id="mp-mine-empty" class="empty-state" style="display:none;"><div class="desc" style="margin:0;">Ainda não tens anúncios.</div></div>
+      </div>
+
+      <div id="marketplace-tab-publicar" class="marketplace-tab" style="display:none;">
+        <div class="card">
+          <div class="lead">Publicar anúncio</div>
+          <div class="field"><label>Título *</label><input id="mp-pub-title" class="input" placeholder="Ex.: Toyota Corolla 2018" /></div>
+          <div class="field"><label>Descrição *</label><textarea id="mp-pub-description" class="input" placeholder="Descreve claramente o anúncio..."></textarea></div>
+          <div class="field"><label>Categoria *</label><input id="mp-pub-category" class="input" placeholder="Ex.: veículos" /></div>
+          <div class="field"><label>Preço (opcional)</label><input id="mp-pub-price" class="input" inputmode="decimal" placeholder="Valor na moeda local" /></div>
+          <div class="field"><label>Condição</label><select id="mp-pub-condition" class="input"><option value="USED">Usado</option><option value="NEW">Novo</option><option value="REFURBISHED">Recondicionado</option></select></div>
+          <div class="field"><label>Província</label><input id="mp-pub-province" class="input" placeholder="Província" /></div>
+          <div class="field"><label>Cidade</label><input id="mp-pub-city" class="input" placeholder="Cidade" /></div>
+          <div class="field"><label>Bairro (opcional)</label><input id="mp-pub-neighborhood" class="input" placeholder="Bairro" /></div>
+          <div class="field"><label>Fotografias (até 10)</label><input id="mp-pub-images" type="file" accept="image/jpeg,image/png,image/webp" multiple class="input" style="padding:10px;" /></div>
+          <button id="mp-pub-submit" class="btn btn-primary">Publicar anúncio</button>
+          <p class="msg msg-muted" style="margin-top:8px;">O anúncio é criado como rascunho, as imagens ficam privadas e a publicação é validada pelo backend e pelo país da conta.</p>
         </div>
       </div>
-      <div id="marketplace-estafeta" style="display:none;">
+
+      <div id="marketplace-tab-pedidos" class="marketplace-tab" style="display:none;">
         <div class="card">
-          <div class="label-caps">Área do estafeta</div>
-          <div class="value-plain" style="margin-top:4px;">As tuas entregas estão no separador 🚚 Entregas.</div>
-          <p class="msg msg-muted" style="text-align:left;margin-top:6px;">Para aceitar entregas novas a partir de um marketplace aberto, o backend precisa de uma operação própria de ofertas. A app não vai inventar essa operação nem expor entregas de outros utilizadores sem autorização.</p>
-          <button id="btn-marketplace-minhas-entregas" class="btn btn-primary btn-sm" style="margin-top:var(--sp-3);">🚚 Abrir minhas entregas</button>
+          <div class="lead">Pedidos de anúncios</div>
+          <p class="msg msg-muted">Aqui aparecem pedidos de compra e os respetivos estados, sem transformar o Marketplace numa loja genérica.</p>
+        </div>
+        <div id="mp-orders" class="stack-sm"></div>
+        <div class="card" style="margin-top:var(--sp-3);">
+          <div class="lead">Meus pedidos de serviço</div>
+          <div id="mp-service-requests" class="stack-sm"></div>
+        </div>
+        <div class="card" style="margin-top:var(--sp-3);">
+          <div class="lead">Minhas propostas</div>
+          <div id="mp-proposals" class="stack-sm"></div>
+        </div>
+      </div>
+
+      <div id="mp-detail-overlay" style="display:none;margin-top:var(--sp-3);">
+        <div class="card">
+          <button id="mp-detail-close" class="btn btn-secondary btn-sm">← Voltar</button>
+          <div id="mp-detail-content" style="margin-top:var(--sp-3);"></div>
         </div>
       </div>
       <p id="marketplace-msg" class="msg" style="margin-top:var(--sp-3);"></p>
@@ -2952,92 +3028,146 @@ document.addEventListener('al:session-expired', function() {
   document.getElementById('auth-msg').textContent = 'Sessão expirada — entra novamente.';
 });
 
-function loadMarketplace() {
-  var roleMsg = document.getElementById('marketplace-role-msg');
-  var management = document.getElementById('marketplace-management');
-  var estafetaBox = document.getElementById('marketplace-estafeta');
-  var list = document.getElementById('marketplace-unassigned-list');
-  var empty = document.getElementById('marketplace-unassigned-empty');
-  var staffList = document.getElementById('marketplace-estafetas-list');
-  var staffEmpty = document.getElementById('marketplace-estafetas-empty');
-  if (!roleMsg) return;
-
-  var canManage = ['super_admin','admin_nacional','admin_provincial','admin_municipal'].some(function(r) { return myRoles.indexOf(r) > -1; });
-  var isEstafeta = myRoles.indexOf('estafeta') > -1;
-  management.style.display = canManage ? 'block' : 'none';
-  estafetaBox.style.display = isEstafeta ? 'block' : 'none';
-
-  if (canManage) {
-    roleMsg.textContent = 'Gestão de ofertas e estafetas. A atribuição continua protegida pelo backend existente.';
-    list.innerHTML = '<p class="msg msg-muted">A carregar entregas...</p>';
-    staffList.innerHTML = '<p class="msg msg-muted">A carregar estafetas...</p>';
-    Promise.all([
-      fetch(SUPABASE_URL + '/functions/v1/admin?action=list_unassigned_deliveries', {
-        method:'POST', headers:{'Content-Type':'application/json','apikey':ANON_KEY,'Authorization':'Bearer '+session.access_token}, body:'{}'
-      }).then(function(r){ return r.json(); }),
-      fetch(SUPABASE_URL + '/functions/v1/admin?action=list_estafetas', {
-        method:'POST', headers:{'Content-Type':'application/json','apikey':ANON_KEY,'Authorization':'Bearer '+session.access_token}, body:'{}'
-      }).then(function(r){ return r.json(); })
-    ]).then(function(results) {
-      var deliveries = results[0].deliveries || [];
-      var estafetas = results[1].estafetas || [];
-      list.innerHTML=''; staffList.innerHTML='';
-      empty.style.display = deliveries.length ? 'none' : 'block';
-      staffEmpty.style.display = estafetas.length ? 'none' : 'block';
-      var options = estafetas.map(function(e){ return '<option value="'+e.id+'">'+(e.email || e.id)+'</option>'; }).join('');
-      deliveries.forEach(function(d){
-        var div=document.createElement('div'); div.className='list-item';
-        var addr=d.addresses||{};
-        var conf=entregaTerritorialConfidence(addr);
-        var confText='Confiança territorial: '+conf.label+(conf.score!=null?' ('+conf.score+'/100)':'');
-        var confClass=(conf.label==='Baixa'||conf.label==='Requer atenção')?'msg msg-error':'msg msg-muted';
-        div.innerHTML='<div class="value-md" style="color:var(--accent);font-weight:700;">'+(d.tracking_code||d.id)+'</div>'+
-          '<div style="font-size:11.5px;color:var(--text-dim);margin:3px 0 6px;">'+(d.recipient_name||'Destinatário não indicado')+'</div>'+
-          '<div class="'+confClass+'" style="margin:0 0 8px;">📍 '+confText+(addr.flagged_for_review?' · marcada para revisão':'')+'</div>'+
-          (options ? '<select class="input marketplace-assign-select" style="height:40px;margin-bottom:8px;">'+options+'</select><button data-delivery="'+d.id+'" class="marketplace-assign-btn btn btn-success-solid btn-sm">Atribuir estafeta</button>' : '<p class="msg msg-muted">Sem estafetas disponíveis para atribuição.</p>');
-        list.appendChild(div);
-      });
-      document.querySelectorAll('.marketplace-assign-btn').forEach(function(b){
-        var row=b.parentElement, select=row.querySelector('.marketplace-assign-select');
-        fetch(SUPABASE_URL + '/functions/v1/admin?action=dispatch_context', {
-          method:'POST', headers:{'Content-Type':'application/json','apikey':ANON_KEY,'Authorization':'Bearer '+session.access_token},
-          body:JSON.stringify({delivery_id:b.dataset.delivery})
-        }).then(function(r){return r.json();}).then(function(ctx){
-          if(!ctx || !ctx.drivers || !select) return;
-          Array.prototype.slice.call(select.options).forEach(function(opt){
-            var s=ctx.drivers[opt.value];
-            if(!s) return;
-            var rate=s.events ? Math.round((s.delivered/s.events)*100) : null;
-            opt.textContent=(opt.textContent||opt.value)+' · '+s.events+' reg.'+(rate!=null?' · '+rate+'% concluídas':'');
-          });
-        }).catch(function(){ /* contexto é informativo; falha não impede atribuição */ });
-      });
-
-      estafetas.forEach(function(e){
-        var div=document.createElement('div'); div.className='list-item';
-        div.innerHTML='<div class="value-plain">🧑‍✈️ '+(e.email||'Estafeta')+'</div><div style="font-size:11px;color:var(--text-dim);margin-top:3px;">Estado gerido pelo sistema de identidade e permissões.</div>';
-        staffList.appendChild(div);
-      });
-      document.querySelectorAll('.marketplace-assign-btn').forEach(function(b){
-        b.addEventListener('click',function(){
-          var select=b.parentElement.querySelector('.marketplace-assign-select'); b.disabled=true; b.textContent='A atribuir...';
-          fetch(SUPABASE_URL + '/functions/v1/deliveries?action=assign_driver', {
-            method:'POST', headers:{'Content-Type':'application/json','apikey':ANON_KEY,'Authorization':'Bearer '+session.access_token},
-            body:JSON.stringify({delivery_id:b.dataset.delivery,driver_id:select.value})
-          }).then(function(r){ return r.json(); }).then(function(data){
-            if(data.error){ document.getElementById('marketplace-msg').className='msg msg-error'; document.getElementById('marketplace-msg').textContent=data.error; }
-            else { document.getElementById('marketplace-msg').className='msg msg-success'; document.getElementById('marketplace-msg').textContent='Entrega atribuída com sucesso.'; loadMarketplace(); }
-          }).catch(function(){ document.getElementById('marketplace-msg').className='msg msg-error'; document.getElementById('marketplace-msg').textContent='Erro de ligação.'; b.disabled=false; b.textContent='Atribuir estafeta'; });
-        });
-      });
-    }).catch(function(){
-      list.innerHTML='<p class="msg msg-error">Não foi possível carregar o marketplace.</p>'; staffList.innerHTML='';
+function mpCall(action, body) {
+  if (!session || !session.access_token) return Promise.reject(new Error('SESSION_REQUIRED'));
+  return fetch(SUPABASE_URL + '/functions/v1/marketplace', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','apikey':ANON_KEY,'Authorization':'Bearer '+session.access_token},
+    body:JSON.stringify({action:action, body:body||{}})
+  }).then(function(r){
+    return r.text().then(function(txt){
+      var data={}; try{ data=txt?JSON.parse(txt):{}; }catch(e){ data={error:'Resposta inválida do servidor.'}; }
+      if(!r.ok || data.error) throw new Error(data.error || ('MARKETPLACE_HTTP_'+r.status));
+      return data;
     });
-  } else if (isEstafeta) {
-    roleMsg.textContent = 'Área do estafeta. As entregas atribuídas estão no separador Entregas.';
-  } else {
-    roleMsg.textContent = 'O marketplace de atribuição está disponível apenas para funções autorizadas.';
-  }
+  });
+}
+function mpSetMsg(text, ok) {
+  var el=document.getElementById('marketplace-feedback');
+  if(!el)return;
+  el.className='msg '+(ok?'msg-success':'msg-error');
+  el.textContent=text||'';
+}
+function mpEsc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function mpMoney(v,c){return v==null?'Preço sob consulta':(Number(v).toLocaleString('pt-PT',{minimumFractionDigits:2})+' '+(c||''));}
+function mpShowTab(tab){
+  document.querySelectorAll('.marketplace-main-tab').forEach(function(b){b.classList.toggle('active',b.dataset.mpTab===tab);});
+  document.querySelectorAll('.marketplace-tab').forEach(function(x){x.style.display=x.id==='marketplace-tab-'+tab?'block':'none';});
+  document.getElementById('mp-detail-overlay').style.display='none';
+  if(tab==='descobrir')mpLoadListings();
+  if(tab==='favoritos')mpLoadFavorites();
+  if(tab==='meus')mpLoadMine();
+  if(tab==='servicos')mpLoadProviders();
+  if(tab==='pedidos')mpLoadOrders();
+}
+function mpRenderListing(item, target, mine){
+  var div=document.createElement('div');div.className='list-item';
+  div.innerHTML='<div class="value-md" style="font-weight:700;">'+mpEsc(item.title)+'</div>'+
+    '<div style="font-size:11.5px;color:var(--text-dim);margin:4px 0;">'+mpEsc(item.category)+' · '+mpEsc(item.condition==='NEW'?'Novo':item.condition==='REFURBISHED'?'Recondicionado':'Usado')+' · '+mpEsc(item.city||item.province||'Localização não indicada')+'</div>'+
+    '<div style="font-weight:700;color:var(--accent);">'+mpMoney(item.price,item.currency)+'</div>'+
+    '<div class="btn-row" style="margin-top:8px;">'+
+    '<button class="btn btn-primary btn-sm mp-view" data-id="'+mpEsc(item.id)+'">Ver</button>'+
+    '<button class="btn btn-secondary btn-sm mp-fav" data-id="'+mpEsc(item.id)+'">⭐ Favorito</button>'+
+    (mine&&item.status==='ACTIVE'?'<button class="btn btn-secondary btn-sm mp-pause" data-id="'+mpEsc(item.id)+'">Pausar</button>':'')+
+    (mine&&item.status==='PAUSED'?'<button class="btn btn-secondary btn-sm mp-publish" data-id="'+mpEsc(item.id)+'">Publicar</button>':'')+
+    '</div>';
+  target.appendChild(div);
+}
+function mpBindListingActions(root, mine){
+  root.querySelectorAll('.mp-view').forEach(function(b){b.onclick=function(){mpOpenDetail(b.dataset.id);};});
+  root.querySelectorAll('.mp-fav').forEach(function(b){b.onclick=function(){mpCall('favorite',{listing_id:b.dataset.id,enabled:true}).then(function(){mpSetMsg('Guardado nos favoritos.',true);}).catch(function(e){mpSetMsg(e.message,false);});};});
+  root.querySelectorAll('.mp-pause').forEach(function(b){b.onclick=function(){b.disabled=true;mpCall('pause',{listing_id:b.dataset.id}).then(mpLoadMine).catch(function(e){mpSetMsg(e.message,false);b.disabled=false;});};});
+  root.querySelectorAll('.mp-publish').forEach(function(b){b.onclick=function(){b.disabled=true;mpCall('publish',{listing_id:b.dataset.id}).then(mpLoadMine).catch(function(e){mpSetMsg(e.message,false);b.disabled=false;});};});
+}
+function mpLoadListings(){
+  var box=document.getElementById('mp-listings');if(!box)return;box.innerHTML='<p class="msg msg-muted">A carregar anúncios...</p>';
+  mpCall('list',{q:(document.getElementById('mp-search').value||'').trim()||undefined,category:(document.getElementById('mp-category').value||'').trim()||undefined})
+  .then(function(r){
+    box.innerHTML='';(r.listings||[]).forEach(function(x){mpRenderListing(x,box,false);});
+    document.getElementById('mp-listings-empty').style.display=(r.listings||[]).length?'none':'block';
+    var role=document.getElementById('marketplace-role-msg');if(role)role.textContent='Marketplace de '+(r.country_code||'o teu país')+' · '+(r.currency||'moeda local');
+    mpBindListingActions(box,false);
+  }).catch(function(e){box.innerHTML='<p class="msg msg-error">'+mpEsc(e.message)+'</p>';});
+}
+function mpLoadFavorites(){
+  var box=document.getElementById('mp-favorites');box.innerHTML='<p class="msg msg-muted">A carregar favoritos...</p>';
+  mpCall('favorites').then(function(r){box.innerHTML='';(r.listings||[]).forEach(function(x){mpRenderListing(x,box,false);});document.getElementById('mp-favorites-empty').style.display=(r.listings||[]).length?'none':'block';mpBindListingActions(box,false);}).catch(function(e){box.innerHTML='<p class="msg msg-error">'+mpEsc(e.message)+'</p>';});
+}
+function mpLoadMine(){
+  var box=document.getElementById('mp-mine');box.innerHTML='<p class="msg msg-muted">A carregar os teus anúncios...</p>';
+  mpCall('mine').then(function(r){box.innerHTML='';(r.listings||[]).forEach(function(x){mpRenderListing(x,box,true);});document.getElementById('mp-mine-empty').style.display=(r.listings||[]).length?'none':'block';mpBindListingActions(box,true);}).catch(function(e){box.innerHTML='<p class="msg msg-error">'+mpEsc(e.message)+'</p>';});
+}
+function mpOpenDetail(id){
+  var overlay=document.getElementById('mp-detail-overlay'),box=document.getElementById('mp-detail-content');
+  overlay.style.display='block';box.innerHTML='<p class="msg msg-muted">A carregar anúncio...</p>';
+  mpCall('detail',{listing_id:id}).then(function(r){
+    var x=r.listing||{};var imgs=r.images||[];
+    box.innerHTML='<div class="value-lg">'+mpEsc(x.title)+'</div>'+
+      '<div class="msg msg-muted">'+mpEsc(x.category)+' · '+mpEsc(x.city||x.province||'Localização não indicada')+'</div>'+
+      (imgs.length?'<div style="display:flex;gap:8px;overflow:auto;margin:10px 0;">'+imgs.map(function(im){return '<img src="'+mpEsc(im.url)+'" style="width:180px;height:140px;object-fit:cover;border-radius:10px;">';}).join('')+'</div>':'')+
+      '<div class="value-md" style="color:var(--accent);margin-top:8px;">'+mpMoney(x.price,x.currency)+'</div>'+
+      '<div class="card" style="margin-top:10px;"><div class="label-caps">Descrição</div><div style="margin-top:5px;">'+mpEsc(x.description||'Sem descrição.')+'</div></div>'+
+      '<div class="btn-row" style="margin-top:10px;"><button id="mp-detail-favorite" class="btn btn-secondary">⭐ Guardar favorito</button><button id="mp-detail-contact" class="btn btn-primary">💬 Contactar</button><button id="mp-detail-order" class="btn btn-success-solid">📦 Fazer pedido</button></div>'+
+      '<div id="mp-contact-box" style="display:none;margin-top:10px;"><textarea id="mp-contact-text" class="input" placeholder="Escreve a tua mensagem..."></textarea><button id="mp-contact-send" class="btn btn-primary" style="margin-top:6px;">Enviar mensagem</button></div>'+
+      '<div id="mp-order-box" style="display:none;margin-top:10px;"><input id="mp-order-qty" class="input" type="number" min="1" value="1" placeholder="Quantidade"><textarea id="mp-order-message" class="input" style="margin-top:6px;" placeholder="Mensagem ao vendedor (opcional)"></textarea><button id="mp-order-send" class="btn btn-primary" style="margin-top:6px;">Enviar pedido</button></div>';
+    document.getElementById('mp-detail-favorite').onclick=function(){mpCall('favorite',{listing_id:x.id,enabled:true}).then(function(){mpSetMsg('Anúncio guardado nos favoritos.',true);}).catch(function(e){mpSetMsg(e.message,false);});};
+    document.getElementById('mp-detail-contact').onclick=function(){document.getElementById('mp-contact-box').style.display='block';};
+    document.getElementById('mp-detail-order').onclick=function(){document.getElementById('mp-order-box').style.display='block';};
+    document.getElementById('mp-contact-send').onclick=function(){var m=document.getElementById('mp-contact-text').value.trim();if(m.length<2){mpSetMsg('Escreve uma mensagem.',false);return;}mpCall('interest',{listing_id:x.id,message:m}).then(function(){mpSetMsg('Mensagem enviada ao anunciante.',true);}).catch(function(e){mpSetMsg(e.message,false);});};
+    document.getElementById('mp-order-send').onclick=function(){var q=Math.max(1,Number(document.getElementById('mp-order-qty').value||1));var m=document.getElementById('mp-order-message').value.trim();mpCall('listing-order-create',{listing_id:x.id,quantity:q,message:m||undefined}).then(function(){mpSetMsg('Pedido enviado ao vendedor.',true);mpShowTab('pedidos');}).catch(function(e){mpSetMsg(e.message,false);});};
+  }).catch(function(e){box.innerHTML='<p class="msg msg-error">'+mpEsc(e.message)+'</p>';});
+}
+function mpLoadProviders(){
+  var box=document.getElementById('mp-providers');box.innerHTML='<p class="msg msg-muted">A procurar profissionais...</p>';
+  var type=document.querySelector('.mp-provider-filter.active');var body={q:(document.getElementById('mp-service-search').value||'').trim()||undefined,category:(document.getElementById('mp-service-category').value||'').trim()||undefined,provider_type:type?type.dataset.provider:undefined};
+  mpCall('service-providers',body).then(function(r){box.innerHTML='';(r.providers||[]).forEach(function(p){
+    var d=document.createElement('div');d.className='list-item';d.innerHTML='<div class="value-md" style="font-weight:700;">'+mpEsc(p.display_name)+(p.verified?' ✓':'')+'</div><div style="font-size:11.5px;color:var(--text-dim);">'+mpEsc(p.provider_type==='BUSINESS'?'Empresa':'Freelancer')+' · '+mpEsc(p.city||p.province||'Localização não indicada')+'</div><div style="margin-top:4px;">'+mpEsc(p.headline||'Prestador de serviços Localiza')+'</div><button class="btn btn-primary btn-sm mp-provider-detail" data-id="'+mpEsc(p.id)+'" style="margin-top:8px;">Ver serviços</button>';box.appendChild(d);
+  });box.querySelectorAll('.mp-provider-detail').forEach(function(b){b.onclick=function(){mpCall('service-detail',{provider_id:b.dataset.id}).then(function(r){mpSetMsg((r.services||[]).length+' serviço(s) disponíveis para este prestador.',true);}).catch(function(e){mpSetMsg(e.message,false);});};});}).catch(function(e){box.innerHTML='<p class="msg msg-error">'+mpEsc(e.message)+'</p>';});
+}
+function mpLoadOrders(){
+  var orders=document.getElementById('mp-orders');orders.innerHTML='<p class="msg msg-muted">A carregar pedidos...</p>';
+  Promise.all([mpCall('listing-orders'),mpCall('my-service-requests'),mpCall('my-proposals')]).then(function(a){
+    orders.innerHTML='';(a[0].orders||[]).forEach(function(o){var d=document.createElement('div');d.className='list-item';d.innerHTML='<b>'+mpEsc(o.status)+'</b><div style="font-size:11.5px;color:var(--text-dim);">Quantidade: '+o.quantity+' · Total: '+mpMoney(o.total_amount,o.currency)+'</div>';orders.appendChild(d);});
+    var sr=document.getElementById('mp-service-requests');sr.innerHTML='';(a[1].requests||[]).forEach(function(x){var d=document.createElement('div');d.className='list-item';d.innerHTML='<b>'+mpEsc(x.title)+'</b><div>'+mpEsc(x.status)+'</div><div style="font-size:11px;color:var(--text-dim);">'+mpEsc(x.description)+'</div>';sr.appendChild(d);});
+    var pr=document.getElementById('mp-proposals');pr.innerHTML='';(a[2].proposals||[]).forEach(function(x){var d=document.createElement('div');d.className='list-item';d.innerHTML='<b>'+mpEsc(x.status)+'</b><div>'+mpEsc(x.message)+'</div><div>'+mpMoney(x.amount,x.currency)+'</div>';pr.appendChild(d);});
+  }).catch(function(e){orders.innerHTML='<p class="msg msg-error">'+mpEsc(e.message)+'</p>';});
+}
+function mpPublish(){
+  var title=document.getElementById('mp-pub-title').value.trim(),description=document.getElementById('mp-pub-description').value.trim(),category=document.getElementById('mp-pub-category').value.trim();
+  if(!title||!description||!category){mpSetMsg('Título, descrição e categoria são obrigatórios.',false);return;}
+  var raw=document.getElementById('mp-pub-price').value.trim(),price=raw===''?null:Number(raw.replace(',','.'));if(price!==null&&(!Number.isFinite(price)||price<0)){mpSetMsg('Preço inválido.',false);return;}
+  var btn=document.getElementById('mp-pub-submit');btn.disabled=true;btn.textContent='A publicar...';
+  mpCall('create',{title:title,description:description,category:category,price:price,condition:document.getElementById('mp-pub-condition').value,province:document.getElementById('mp-pub-province').value.trim()||null,city:document.getElementById('mp-pub-city').value.trim()||null,neighborhood:document.getElementById('mp-pub-neighborhood').value.trim()||null,contact_message:true})
+  .then(function(r){
+    var files=Array.prototype.slice.call(document.getElementById('mp-pub-images').files||[]).slice(0,10),chain=Promise.resolve();
+    files.forEach(function(file,i){chain=chain.then(function(){var ext=(file.name.split('.').pop()||'jpg').toLowerCase();if(['jpg','jpeg','png','webp'].indexOf(ext)<0)throw new Error('FORMATO_IMAGEM_NAO_SUPORTADO');return mpCall('image-upload-url',{listing_id:r.listing.id,extension:ext}).then(function(u){return fetch(SUPABASE_URL+'/storage/v1/object/upload/sign/'+u.path,{method:'PUT',headers:{'Content-Type':file.type||'image/jpeg','x-upsert':'false'},body:file}).then(function(resp){if(!resp.ok)throw new Error('UPLOAD_IMAGEM_FALHOU');return mpCall('register-image',{listing_id:r.listing.id,storage_path:u.path,sort_order:i});});});});
+    return chain.then(function(){return mpCall('publish',{listing_id:r.listing.id});});
+  }).then(function(){mpSetMsg('Anúncio publicado com sucesso.',true);document.getElementById('mp-pub-title').value='';document.getElementById('mp-pub-description').value='';document.getElementById('mp-pub-price').value='';document.getElementById('mp-pub-images').value='';mpShowTab('meus');})
+  .catch(function(e){mpSetMsg(e.message,false);}).finally(function(){btn.disabled=false;btn.textContent='Publicar anúncio';});
+}
+function mpInit(){
+  document.querySelectorAll('.marketplace-main-tab').forEach(function(b){b.onclick=function(){mpShowTab(b.dataset.mpTab);};});
+  document.getElementById('mp-search-btn').onclick=mpLoadListings;
+  document.getElementById('mp-service-search-btn').onclick=mpLoadProviders;
+  document.querySelectorAll('.mp-provider-filter').forEach(function(b){b.onclick=function(){document.querySelectorAll('.mp-provider-filter').forEach(function(x){x.classList.remove('active');});b.classList.add('active');};});
+  document.getElementById('mp-service-request-btn').onclick=function(){document.getElementById('mp-service-request-box').style.display='block';};
+  document.getElementById('mp-service-request-cancel').onclick=function(){document.getElementById('mp-service-request-box').style.display='none';};
+  document.getElementById('mp-request-submit').onclick=function(){
+    var title=document.getElementById('mp-request-title').value.trim(),desc=document.getElementById('mp-request-description').value.trim();
+    if(!title||desc.length<10){mpSetMsg('Indica um título e uma descrição com pelo menos 10 caracteres.',false);return;}
+    var budgetRaw=document.getElementById('mp-request-budget').value.trim(),budget=budgetRaw===''?null:Number(budgetRaw.replace(',','.'));
+    if(budget!==null&&(!Number.isFinite(budget)||budget<0)){mpSetMsg('Orçamento inválido.',false);return;}
+    var b=document.getElementById('mp-request-submit');b.disabled=true;
+    mpCall('request-service',{title:title,description:desc,category:document.getElementById('mp-request-category').value.trim()||'outros',budget_max:budget,preferred_date:document.getElementById('mp-request-date').value||null}).then(function(){mpSetMsg('Pedido de serviço publicado. Os prestadores poderão enviar propostas.',true);document.getElementById('mp-service-request-box').style.display='none';mpLoadOrders();}).catch(function(e){mpSetMsg(e.message,false);}).finally(function(){b.disabled=false;});
+  };
+  document.getElementById('mp-pub-submit').onclick=mpPublish;
+  document.getElementById('mp-detail-close').onclick=function(){document.getElementById('mp-detail-overlay').style.display='none';};
+  mpShowTab('descobrir');
+}
+function loadMarketplace(){
+  var role=document.getElementById('marketplace-role-msg');if(role)role.textContent='Marketplace Localiza · a carregar...';
+  if(!session){if(role)role.textContent='Inicia sessão para usar o Marketplace.';return;}
+  mpInit();
 }
 
 // Sincronização de interface: ao voltar para a APP/site ou recuperar a ligação,
