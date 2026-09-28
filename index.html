@@ -1720,19 +1720,7 @@ function stopAllCameraStreams() {
   };
 })();
 
-// Segurança de renderização: todos os innerHTML dinâmicos passam pelo DOMPurify.
-// Isto reduz a superfície de XSS mesmo quando uma resposta da API contém texto não confiável.
-(function instalarSanitizacaoHTML() {
-  if (!window.DOMPurify || !window.Element) return;
-  var descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
-  if (!descriptor || !descriptor.set || !descriptor.get) return;
-  Object.defineProperty(Element.prototype, 'innerHTML', {
-    configurable: descriptor.configurable,
-    enumerable: descriptor.enumerable,
-    get: descriptor.get,
-    set: function(value) { descriptor.set.call(this, window.DOMPurify.sanitize(String(value == null ? '' : value))); }
-  });
-})();
+// Sanitização: aplicada explicitamente nos pontos que renderizam dados não confiáveis.\n// Não alteramos o setter nativo de Element.prototype.innerHTML para evitar interferência com Leaflet/DOM.
 
 function getCurrentUserId() {
   if (!session || !session.access_token) return null;
