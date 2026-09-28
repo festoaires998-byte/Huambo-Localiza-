@@ -803,7 +803,7 @@ var APP_BUILD_ID = "20260926-101500";
       </div>
     </div>
 
-    <div id="panel-marketplace" class="panel">
+    <div id="panel-marketplace" class="panel" style="display:none!important;" aria-hidden="true">
       <div class="card" style="margin-bottom:var(--sp-4);">
         <div class="label-caps">Marketplace Localiza</div>
         <div class="value-plain" style="margin-top:4px;">Comprar, vender, contratar serviços e encontrar profissionais</div>
@@ -1450,7 +1450,6 @@ Erros: 400 validação · 401 chave inválida · 403 escopo insuficiente · 404 
       <button id="tab-btn-guardados" class="tab-btn al-tab" data-tab="guardados"><span class="ic">🔖</span>Guardados</button>
       <button id="tab-btn-entrega" class="tab-btn al-tab" data-tab="entrega"><span class="ic">📦</span>Entrega</button>
       <button id="tab-btn-minhas-entregas" class="tab-btn al-tab" data-tab="minhas-entregas" style="display:none;"><span class="ic">🚚</span>Entregas</button>
-      <button id="tab-btn-marketplace" class="tab-btn al-tab" data-tab="marketplace" style="display:none;"><span class="ic">🤝</span>Marketplace</button>
       <button id="tab-btn-campo" class="tab-btn al-tab" data-tab="campo" style="display:none;"><span class="ic">🧭</span>Campo</button>
       <button id="tab-btn-validar" class="tab-btn al-tab" data-tab="validar" style="display:none;"><span class="ic">✅</span>Validar</button>
       <button id="tab-btn-admin" class="tab-btn al-tab" data-tab="admin" style="display:none;"><span class="ic">🛡️</span>Admin</button>
@@ -2993,7 +2992,6 @@ document.getElementById('btn-logout').addEventListener('click', function() {
   session = null; lastAddressId = null; isAdmin = false; myRoles = [];
   document.getElementById('tab-btn-admin').style.display = 'none';
   document.getElementById('tab-btn-minhas-entregas').style.display = 'none';
-  document.getElementById('tab-btn-marketplace').style.display = 'none';
   document.getElementById('tab-btn-campo').style.display = 'none';
   document.getElementById('tab-btn-validar').style.display = 'none';
   document.getElementById('view-app').classList.remove('visible');
@@ -3214,7 +3212,6 @@ function alRefreshOperationalViews(force) {
   var visible = function(id) {
     var el=document.getElementById(id); return el && el.offsetParent !== null;
   };
-  if (visible('marketplace-unassigned-list')) loadMarketplace();
   if (visible('minhas-entregas-list')) loadMinhasEntregas();
   if (visible('admin-panel')) loadAdmin();
 }
@@ -3240,7 +3237,6 @@ document.querySelectorAll('.al-tab').forEach(function(btn) {
     if (btn.dataset.tab === 'entrega') loadEntregaDestinos();
     if (btn.dataset.tab === 'admin') loadAdmin();
     if (btn.dataset.tab === 'minhas-entregas') loadMinhasEntregas();
-    if (btn.dataset.tab === 'marketplace') loadMarketplace();
     if (btn.dataset.tab === 'campo') {
       campoLoadDailyCount(); campoUpdateOfflineMini(); campoLoadBairros(); campoLoadReverificar(); campoMostrarEstadoZonaOffline();
       document.getElementById('btn-canal-campo').style.display = (myRoles.indexOf('tecnico_campo') > -1 || myRoles.indexOf('supervisor') > -1 || myRoles.indexOf('super_admin') > -1) ? 'block' : 'none';
