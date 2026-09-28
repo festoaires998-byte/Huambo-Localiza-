@@ -2408,7 +2408,11 @@ btnSubmit.addEventListener('click', function() {
         document.getElementById('view-signup-check-email').classList.add('visible');
         return;
       }
-      var pendingSession = { access_token: res.data.access_token, email: (res.data.user && res.data.user.email) || email };
+      var pendingSession = {
+    access_token: res.data.access_token,
+    email: (res.data.user && res.data.user.email) || email,
+    country_code: (res.data.user && res.data.user.user_metadata && res.data.user.user_metadata.country_code) || countryCode || 'AO'
+  };
       pendingRefreshToken = res.data.refresh_token;
 
       if (mode === 'signin') {
@@ -2417,7 +2421,9 @@ btnSubmit.addEventListener('click', function() {
         }).then(function(r) { return r.json(); }).then(function(userData) {
           var factors = (userData && userData.factors) || [];
           var verifiedFactor = factors.find(function(f) { return f.status === 'verified'; });
-          if (!verifiedFactor) { session = pendingSession; guardarSessaoLocal(pendingRefreshToken); showApp(); return; }
+          if (!verifiedFactor) { session = pendingSession;
+          session.country_code = (userData && userData.user_metadata && userData.user_metadata.country_code) || session.country_code || 'AO';
+          guardarSessaoLocal(pendingRefreshToken); showApp(); return; }
 
           pendingMfaFactorId = verifiedFactor.id;
           session = pendingSession;
