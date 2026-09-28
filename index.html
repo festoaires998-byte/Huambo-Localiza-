@@ -3196,11 +3196,6 @@ window.addEventListener('online', function(){
 // Listas operacionais são atualizadas por Realtime e por ações explícitas do utilizador.
 // Isto evita reconstruir DOM enquanto o utilizador preenche formulários ou toca nos controlos.
 
-document.getElementById('btn-marketplace-minhas-entregas').addEventListener('click', function(){
-  var btn=document.getElementById('tab-btn-minhas-entregas');
-  if(btn){ btn.click(); }
-});
-
 document.querySelectorAll('.al-tab').forEach(function(btn) {
   btn.addEventListener('click', function() {
     resetTransientFormsOnTabChange();
