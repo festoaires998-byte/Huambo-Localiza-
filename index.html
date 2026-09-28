@@ -3643,39 +3643,76 @@ function entregaSetOrigem(ponto, sourceType, addressId) {
 }
 
 function loadEntregaDestinos() {
-  if (!session) return;
-  var sel = document.getElementById('entrega-destino');
-  sel.innerHTML = '<option value="">A carregar...</option>';
-  fetch(SUPABASE_URL + '/rest/v1/favorites?select=address_id,addresses(id,postal_code,plus_code,reference,status,flagged_for_review,municipality_id,province_id,latitude,longitude,confidence_score,accuracy_meters,validated_at,quadra_id,street_id)&order=created_at.desc', {
+  var selDestino = document.getElementById('entrega-destino');
+  var selOrigem = document.getElementById('entrega-origem-select');
+  if (!selDestino || !selOrigem) return Promise.resolve([]);
+  if (!session || !session.access_token) {
+    [selDestino, selOrigem].forEach(function(s) {
+      s.innerHTML = '<option value="">Sessão ainda a carregar…</option>';
+      s.disabled = true;
+    });
+    return Promise.resolve([]);
+  }
+
+  [selDestino, selOrigem].forEach(function(s) {
+    s.disabled = true;
+    s.innerHTML = '<option value="">A carregar locais guardados…</option>';
+  });
+
+  var url = SUPABASE_URL + '/rest/v1/favorites?select=address_id,addresses(id,postal_code,plus_code,reference,status,flagged_for_review,municipality_id,province_id,latitude,longitude,confidence_score,accuracy_meters,validated_at,quadra_id,street_id)&order=created_at.desc';
+
+  return fetch(url, {
     headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
-  }).then(function(r) { return r.json(); }).then(function(rows) {
-    entregaDestinosCache = {}; entregaOrigensCache = {};
-    entregaDestinosCache = {}; entregaOrigensCache = {};
-    var selects = [sel, document.getElementById('entrega-origem-select')];
-    selects.forEach(function(s) {
-      if (!s) return;
+  }).then(function(r) {
+    if (!r.ok) throw new Error('Não foi possível carregar os locais guardados (' + r.status + ').');
+    return r.json();
+  }).then(function(rows) {
+    if (!Array.isArray(rows)) throw new Error('Resposta inválida ao carregar locais guardados.');
+    entregaDestinosCache = {};
+    entregaOrigensCache = {};
+
+    [selDestino, selOrigem].forEach(function(s) {
       s.innerHTML = '';
       var first = document.createElement('option');
       first.value = '';
-      first.textContent = (rows || []).length ? 'Escolhe um local guardado...' : 'Sem locais guardados — podes usar um código';
+      first.textContent = rows.length ? 'Escolhe um local guardado...' : 'Sem locais guardados — guarda primeiro uma morada';
       s.appendChild(first);
     });
-    (rows || []).forEach(function(f) {
+
+    rows.forEach(function(f) {
       var addr = f.addresses || {};
-      entregaDestinosCache[f.address_id] = addr;
-      entregaOrigensCache[f.address_id] = addr;
+      entregaDestinosCache[String(f.address_id)] = addr;
+      entregaOrigensCache[String(f.address_id)] = addr;
       var label = (addr.postal_code || addr.plus_code || 'sem código') + (addr.reference ? ' — ' + addr.reference : '');
-      selects.forEach(function(s) {
-        if (!s) return;
+      [selDestino, selOrigem].forEach(function(s) {
         var opt = document.createElement('option');
         opt.value = String(f.address_id);
         opt.textContent = label;
         s.appendChild(opt);
       });
     });
+
+    [selDestino, selOrigem].forEach(function(s) {
+      s.disabled = false;
+    });
     entregaUpdateOfflineMini();
-    entregaSetOrigem({}, 'gps');
-  }).catch(function() { sel.innerHTML = '<option value="">Erro ao carregar</option>'; });
+    return rows;
+  }).catch(function(err) {
+    [selDestino, selOrigem].forEach(function(s) {
+      s.disabled = false;
+      s.innerHTML = '';
+      var opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'Erro — tocar para tentar novamente';
+      s.appendChild(opt);
+    });
+    var msg = document.getElementById('entrega-origem-resolver-msg');
+    if (msg) {
+      msg.className = 'msg msg-error';
+      msg.textContent = err && err.message ? err.message : 'Erro ao carregar locais guardados.';
+    }
+    return [];
+  });
 }
 
 function entregaUpdateOfflineMini() {
@@ -3696,6 +3733,11 @@ function entregaAlternarModoPonto(tipo, modo) {
     destino: { guardados:'entrega-destino', codigo:'entrega-destino-codigo-box', qr:'entrega-destino-qr-box', mapa:'entrega-destino-mapa-box', gps:null }
   }[prefix];
   Object.keys(configs).forEach(function(k) { if (configs[k]) document.getElementById(configs[k]).style.display = k === modo ? 'block' : 'none'; });
+  if (modo === 'guardados') {
+    // Carregar antes de o utilizador abrir o menu nativo Android.
+    // Isto evita que o WebView abra o menulist apenas com o placeholder.
+    loadEntregaDestinos();
+  }
   if (tipo === 'origem' && modo === 'gps') {
     document.getElementById('entrega-origem-gps-msg').style.display = 'block';
     entregaSetOrigem({}, 'gps');
