@@ -3184,7 +3184,7 @@ function mpInit(){
   document.getElementById('mp-service-search-btn').onclick=mpLoadProviders;
   document.querySelectorAll('.mp-provider-filter').forEach(function(b){b.onclick=function(){document.querySelectorAll('.mp-provider-filter').forEach(function(x){x.classList.remove('active');});b.classList.add('active');};});
   document.getElementById('mp-service-request-btn').onclick=function(){document.getElementById('mp-service-request-box').style.display='block';};
-  document.getElementById('mp-service-request-cancel').onclick=function(){document.getElementById('mp-service-request-box').style.display='none';};
+  document.getElementById('mp-request-cancel').onclick=function(){document.getElementById('mp-service-request-box').style.display='none';};
   document.getElementById('mp-request-submit').onclick=function(){
     var title=document.getElementById('mp-request-title').value.trim(),desc=document.getElementById('mp-request-description').value.trim();
     if(!title||desc.length<10){mpSetMsg('Indica um título e uma descrição com pelo menos 10 caracteres.',false);return;}
