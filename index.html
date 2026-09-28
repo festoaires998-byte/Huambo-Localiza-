@@ -429,6 +429,13 @@ var APP_BUILD_ID = "20260926-101500";
       </div>
       <p class="lead">Mapa e GPS reais · Código Postal Digital gerado ao vivo</p>
 
+      <div class="card" id="mapas-offline-site" style="margin:var(--sp-4) 0;">
+        <div class="label-caps">🗺️ Mapas offline</div>
+        <p style="margin:6px 0 10px;font-size:12px;color:var(--text-dim);">Descarrega o mapa nacional para o dispositivo e usa-o mesmo sem internet. Cada país é guardado separadamente.</p>
+        <div id="mapas-offline-lista" class="stack-sm"></div>
+        <p id="mapas-offline-msg" class="msg msg-muted" style="margin-top:var(--sp-2);"></p>
+      </div>
+
       <div class="field" style="margin-bottom:var(--sp-3);">
         <input id="search-input" class="input" type="text" placeholder="Pesquisar código, Plus Code, rua, bairro..." />
       </div>
@@ -1436,6 +1443,74 @@ var realtimeDeliveryRetryTimers = {};
 var deliveryTrackingWatches = {};
 var deliveryTrackingLastSent = {};
 var DELIVERY_TRACKING_MIN_INTERVAL_MS = 5000;
+
+const MAPAS_OFFLINE_PALOP = [
+  { codigo:'AO', nome:'🇦🇴 Angola', regiao:'angola' },
+  { codigo:'MZ', nome:'🇲🇿 Moçambique', regiao:'mocambique' },
+  { codigo:'CV', nome:'🇨🇻 Cabo Verde', regiao:'cabo-verde' },
+  { codigo:'GW', nome:'🇬🇼 Guiné-Bissau', regiao:'guine-bissau' },
+  { codigo:'ST', nome:'🇸🇹 São Tomé e Príncipe', regiao:'sao-tome-principe' }
+];
+const MAPAS_OFFLINE_BASE = SUPABASE_URL + '/storage/v1/object/public/mapas/';
+const MAPAS_CACHE = 'angola-localiza-mapas-offline-v1';
+
+function mapasOfflineBytes(n) {
+  if (!Number.isFinite(n)) return 'tamanho desconhecido';
+  if (n >= 1073741824) return (n/1073741824).toFixed(2)+' GB';
+  return (n/1048576).toFixed(1)+' MB';
+}
+async function mapaOfflineLerCache(regiao) {
+  if (!('caches' in window)) return null;
+  const cache = await caches.open(MAPAS_CACHE);
+  return cache.match(MAPAS_OFFLINE_BASE + regiao + '/manifesto.json');
+}
+async function mapaOfflineDescarregar(item, btn, status) {
+  if (!navigator.onLine) { status.textContent='Liga-te à internet para descarregar o mapa.'; return; }
+  btn.disabled=true; status.textContent='A obter manifesto…';
+  try {
+    const mr = await fetch(MAPAS_OFFLINE_BASE + item.regiao + '/manifesto.json', { cache:'no-store' });
+    if (!mr.ok) throw new Error('Manifesto HTTP '+mr.status);
+    const manifest = await mr.json();
+    const url = MAPAS_OFFLINE_BASE + item.regiao + '/' + manifest.ficheiro;
+    status.textContent = 'A descarregar '+mapasOfflineBytes(Number(manifest.bytes))+'…';
+    const response = await fetch(url, { cache:'no-store' });
+    if (!response.ok) throw new Error('Mapa HTTP '+response.status);
+    if (!response.body) throw new Error('O navegador não permite descarga em fluxo.');
+    const total = Number(response.headers.get('content-length')) || Number(manifest.bytes) || 0;
+    const reader=response.body.getReader(); const partes=[]; let recebido=0;
+    while(true) {
+      const p=await reader.read(); if(p.done) break;
+      partes.push(p.value); recebido+=p.value.byteLength;
+      status.textContent='A descarregar '+mapasOfflineBytes(recebido)+(total?' / '+mapasOfflineBytes(total):'')+'…';
+    }
+    const blob=new Blob(partes,{type:'application/octet-stream'});
+    const cache=await caches.open(MAPAS_CACHE);
+    await cache.put(url,new Response(blob,{headers:{'Content-Type':'application/octet-stream','X-Mapa-Manifesto':JSON.stringify(manifest)}}));
+    await cache.put(MAPAS_OFFLINE_BASE + item.regiao + '/manifesto.json',new Response(JSON.stringify(manifest),{headers:{'Content-Type':'application/json'}}));
+    status.textContent='✅ Guardado no dispositivo · '+mapasOfflineBytes(blob.size)+' · versão '+manifest.versao;
+    btn.textContent='Mapa descarregado';
+  } catch(e) {
+    status.textContent='❌ '+(e && e.message ? e.message : 'Não foi possível descarregar.');
+  } finally { btn.disabled=false; }
+}
+async function inicializarMapasOfflineSite() {
+  const lista=document.getElementById('mapas-offline-lista'); if(!lista) return;
+  lista.innerHTML='';
+  MAPAS_OFFLINE_PALOP.forEach(item=>{
+    const row=document.createElement('div'); row.className='card'; row.style.margin='0 0 8px';
+    row.innerHTML='<div style="font-weight:700">'+item.nome+'</div><div class="msg msg-muted" data-status>A verificar…</div><button class="btn btn-secondary btn-sm" data-download>📥 Descarregar mapa</button>';
+    const status=row.querySelector('[data-status]'), btn=row.querySelector('[data-download]');
+    btn.addEventListener('click',()=>mapaOfflineDescarregar(item,btn,status));
+    lista.appendChild(row);
+    mapaOfflineLerCache(item.regiao).then(async cached=>{
+      if(!cached) { status.textContent=navigator.onLine?'Pronto para descarregar.':'Mapa ainda não descarregado.'; return; }
+      try { const m=await cached.json(); status.textContent='✅ Guardado · versão '+m.versao+' · '+mapasOfflineBytes(Number(m.bytes)); btn.textContent='Atualizar mapa'; }
+      catch(_) { status.textContent='Mapa guardado no dispositivo.'; }
+    });
+  });
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', inicializarMapasOfflineSite);
+else inicializarMapasOfflineSite();
 
 function initRealtimeClient() {
   if (alRealtimeClient || !window.supabase || !window.supabase.createClient) return;
