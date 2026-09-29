@@ -5184,7 +5184,6 @@ function renderAuditLog() {
     div.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">' +
         '<div><div class="value-plain">' + (AUDIT_LABELS[log.action] || log.action) + '</div><div style="font-size:11px;color:var(--text-dim);margin-top:2px;">' + (log.entity_type || '') + ' · ' + when + '</div></div>' +
-        (isSuperAdmin ? '<button data-id="' + log.id + '" class="audit-eliminar-btn icon-btn" aria-label="Eliminar" style="font-size:14px;">🗑️</button>' : '') +
       '</div>';
     list.appendChild(div);
   });
@@ -5625,7 +5624,6 @@ function loadMinhasEntregas() {
   var myId = parseJwt(session.access_token).sub;
   var list = document.getElementById('minhas-entregas-list');
   list.innerHTML = '<p class="msg msg-muted">A carregar...</p>';
-  document.getElementById('btn-limpar-historico-entregas').style.display = myRoles.indexOf('super_admin') > -1 ? 'block' : 'none';
   document.getElementById('btn-sugerir-ordem').style.display = (myRoles.indexOf('estafeta') > -1) ? 'block' : 'none';
   document.getElementById('btn-canal-estafetas').style.display = (myRoles.indexOf('estafeta') > -1 || myRoles.indexOf('operador_postal') > -1 || myRoles.indexOf('super_admin') > -1) ? 'block' : 'none';
   ordemSugeridaMap = {};
