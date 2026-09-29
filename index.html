@@ -5188,18 +5188,6 @@ function renderAuditLog() {
       '</div>';
     list.appendChild(div);
   });
-  document.querySelectorAll('.audit-eliminar-btn').forEach(function(b) {
-    b.addEventListener('click', function() {
-      if (!confirm('Eliminar este registo de auditoria?')) return;
-      fetch(SUPABASE_URL + '/functions/v1/admin?action=delete_audit_log', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
-        body: JSON.stringify({ log_id: b.dataset.id })
-      }).then(function(r) { return r.json(); }).then(function(data) {
-        if (data.error) { alert(data.error); return; }
-        loadAuditLog();
-      }).catch(function() { alert('Erro de ligação.'); });
-    });
-  });
 }
 
 // ---- Importar/Exportar ----
