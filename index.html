@@ -820,7 +820,7 @@ var APP_BUILD_ID = "20260926-101500";
         <p id="estafeta-disponiveis-msg" class="msg" style="margin-top:8px;"></p>
       </div>
       <p id="entregas-offline-mini" class="msg msg-muted" style="margin:0 0 var(--sp-3);"></p>
-      <button id="btn-limpar-historico-entregas" class="btn btn-danger-outline btn-sm" style="display:none;margin-bottom:var(--sp-3);">🗑️ Limpar histórico de entregas (super admin)</button>
+      
       <button id="btn-sugerir-ordem" class="btn btn-secondary btn-sm" style="display:none;margin-bottom:var(--sp-3);">🧭 Sugerir ordem das entregas</button>
       <button id="btn-canal-estafetas" class="btn btn-secondary btn-sm" style="display:none;margin-bottom:var(--sp-3);">💬 Falar com a organização</button>
       <p id="ordem-sugerida-msg" class="msg msg-muted" style="display:none;"></p>
@@ -1262,7 +1262,7 @@ Erros: 400 validação · 401 chave inválida · 403 escopo insuficiente · 404 
 
       <!-- ===== AUDITORIA ===== -->
       <div class="admin-tab-content" data-admin-tab="auditoria" style="display:none;">
-        <button id="btn-limpar-auditoria" class="btn btn-danger-outline btn-sm" style="display:none;margin-bottom:var(--sp-3);">🗑️ Eliminar toda a auditoria (super admin)</button>
+        
         <div class="field">
           <select id="audit-filter-action" class="input">
             <option value="">Todas as ações</option>
@@ -5154,7 +5154,6 @@ var AUDIT_LABELS = {
 };
 var auditLogsCache = [];
 function loadAuditLog() {
-  document.getElementById('btn-limpar-auditoria').style.display = myRoles.indexOf('super_admin') > -1 ? 'block' : 'none';
   fetch(SUPABASE_URL + '/functions/v1/admin?action=audit', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }, body: '{}'
   }).then(function(r) { return r.json(); }).then(function(data) {
@@ -5167,18 +5166,7 @@ function loadAuditLog() {
   }).catch(function() {});
 }
 document.getElementById('audit-filter-action').addEventListener('change', renderAuditLog);
-document.getElementById('btn-limpar-auditoria').addEventListener('click', function() {
-  var digitado = prompt('Isto apaga TODOS os registos de auditoria, para sempre. Escreve exatamente "ELIMINAR TUDO" para confirmar:');
-  if (digitado !== 'ELIMINAR TUDO') { if (digitado !== null) alert('Não confirmado — nada foi apagado.'); return; }
-  fetch(SUPABASE_URL + '/functions/v1/admin?action=clear_audit_logs', {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
-    body: JSON.stringify({ confirm: 'ELIMINAR TUDO' })
-  }).then(function(r) { return r.json(); }).then(function(data) {
-    if (data.error) { alert(data.error); return; }
-    alert(data.deleted + ' registo(s) eliminado(s).');
-    loadAuditLog();
-  }).catch(function() { alert('Erro de ligação.'); });
-});
+
 function renderAuditLog() {
   var filterVal = document.getElementById('audit-filter-action').value;
   var logs = filterVal ? auditLogsCache.filter(function(l) { return l.action === filterVal; }) : auditLogsCache;
@@ -5679,19 +5667,7 @@ function loadMinhasEntregas() {
   entregasUpdateOfflineMini();
 }
 
-document.getElementById('btn-limpar-historico-entregas').addEventListener('click', function() {
-  var digitado = prompt('ATENÇÃO: isto apaga TODAS as entregas do sistema, incluindo provas e livro-razão. Escreve exatamente "ELIMINAR TUDO" para confirmar:');
-  if (digitado !== 'ELIMINAR TUDO') { if (digitado !== null) alert('Não confirmado — nada foi apagado.'); return; }
-  if (!confirm('ÚLTIMA CONFIRMAÇÃO: esta ação é potencialmente irreversível. Queres realmente continuar?')) return;
-  fetch(SUPABASE_URL + '/functions/v1/deliveries?action=clear_all', {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
-    body: JSON.stringify({ confirm: 'ELIMINAR TUDO' })
-  }).then(function(r) { return r.json(); }).then(function(data) {
-    if (data.error) { alert(data.error); return; }
-    alert(data.deleted + ' entrega(s) eliminada(s).');
-    loadMinhasEntregas();
-  }).catch(function() { alert('Erro de ligação.'); });
-});
+
 
 function entregasUpdateOfflineMini() {
   var el = document.getElementById('entregas-offline-mini');
