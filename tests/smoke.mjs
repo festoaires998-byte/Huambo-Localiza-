@@ -1,0 +1,202 @@
+// Testes do site num navegador verdadeiro (Chromium, via Playwright).
+// O Supabase é simulado: nenhum pedido sai para a internet.
+// Correr: node tests/smoke.mjs
+import http from 'node:http';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
+
+const RAIZ = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const UID = 'aaaaaaaa-0000-4000-8000-000000000001';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+const TOKEN = `${b64({ alg: 'HS256' })}.${b64({ sub: UID, email: 't@exemplo.ao' })}.x`;
+const MAU = '<img src=x onerror="window.__xss=1">';
+
+const tipos = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png' };
+const servidor = http.createServer(async (req, res) => {
+  const nome = decodeURIComponent(new URL(req.url, 'http://x').pathname).replace(/^\/+/, '') || 'index.html';
+  try {
+    const dados = await readFile(path.join(RAIZ, nome));
+    res.writeHead(200, { 'Content-Type': tipos[path.extname(nome)] || 'application/octet-stream' });
+    res.end(dados);
+  } catch { res.writeHead(404); res.end(); }
+});
+await new Promise((r) => servidor.listen(0, '127.0.0.1', r));
+const BASE = `http://127.0.0.1:${servidor.address().port}/`;
+
+const browser = await chromium.launch(process.env.PLAYWRIGHT_BROWSERS_PATH ? {} : {});
+const pedidos = [];
+let respostaStorage = { status: 200, body: { Key: 'ok' } };
+
+async function abrir(query = '') {
+  const context = await browser.newContext({ serviceWorkers: 'block' });
+  const page = await context.newPage();
+  const erros = [];
+  page.on('pageerror', (e) => erros.push(String(e)));
+  // Tudo o que não é o próprio site é simulado ou bloqueado.
+  await page.route((url) => !url.href.startsWith(BASE), async (route) => {
+    const u = new URL(route.request().url());
+    const corpo = route.request().postData();
+    pedidos.push({ url: u.href, corpo });
+    const json = (o, status = 200) => route.fulfill({ status, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(o) });
+    if (u.pathname.endsWith('/functions/v1/deliveries') && u.searchParams.get('action') === 'track') {
+      return json({ tracking_code: 'AL-TESTE1', status: 'IN_TRANSIT', destination_area: MAU, history: [{ status: 'CREATED', created_at: '2026-09-30T10:00:00Z' }, { status: MAU, created_at: '2026-09-30T11:00:00Z' }] });
+    }
+    if (u.pathname.endsWith('/functions/v1/pesquisa') && u.searchParams.get('action') === 'cartao') {
+      return json({ found: true, address: { postal_code: 'HB-01', plus_code: null, house_number: '12', reference: MAU, rua: 'Rua A', quadra: 'Q1' } });
+    }
+    if (u.pathname.endsWith('/functions/v1/pesquisa')) {
+      return json({ tipo: 'texto', resultados: [{ tipo: 'morada', id: 'm1', titulo: MAU, subtitulo: 'Rua X', latitude: null, longitude: null, codigo_postal: 'X', plus_code: null }] });
+    }
+    if (u.pathname.startsWith('/storage/v1/object/')) return json(respostaStorage.body, respostaStorage.status);
+    if (u.pathname.endsWith('/functions/v1/signing-keys')) return json({ ok: true });
+    if (u.pathname.endsWith('/functions/v1/sync')) {
+      const ops = JSON.parse(corpo).operations;
+      return json({ results: ops.map((o) => ({ operation_id: o.operation_id, status: 'FAILED', error: 'recusada no teste' })) });
+    }
+    if (u.hostname.endsWith('supabase.co')) return json({});
+    return route.abort();
+  });
+  await page.goto(BASE + 'index.html' + query);
+  await page.waitForLoadState('load');
+  return { page, erros, context };
+}
+
+let falhas = 0;
+async function teste(nome, fn) {
+  try { await fn(); console.log('✓', nome); }
+  catch (e) { falhas++; console.error('✗', nome, '\n ', e.message); }
+}
+
+await teste('a página abre sem erros de JavaScript', async () => {
+  const { page, erros, context } = await abrir();
+  await page.waitForTimeout(500);
+  assert.deepEqual(erros, []);
+  await context.close();
+});
+
+await teste('esc() e urlSegura()', async () => {
+  const { page, context } = await abrir();
+  const r = await page.evaluate(() => [esc('<a href="x">\'&'), esc(null), urlSegura('javascript:alert(1)'), urlSegura('https://a/b?c=1&d=2')]);
+  assert.deepEqual(r, ['&lt;a href=&quot;x&quot;&gt;&#39;&amp;', '', '', 'https://a/b?c=1&amp;d=2']);
+  await context.close();
+});
+
+await teste('ids de operação são sempre UUID (também sem crypto.randomUUID)', async () => {
+  const { page, context } = await abrir();
+  const ids = await page.evaluate(() => { const a = makeOperationId(); crypto.randomUUID = undefined; return [a, makeOperationId()]; });
+  ids.forEach((id) => assert.match(id, UUID));
+  await context.close();
+});
+
+await teste('rastreio público: mostra zona e histórico sem executar HTML', async () => {
+  const { page, erros, context } = await abrir('?rastreio=AL-TESTE1');
+  await page.waitForSelector('#rastreio-conteudo .card');
+  const texto = await page.textContent('#rastreio-conteudo');
+  assert.match(texto, /AL-TESTE1/);
+  assert.match(texto, /Em trânsito/);
+  assert.match(texto, /Criada/);
+  assert.equal(await page.locator('#rastreio-conteudo img').count(), 0);
+  assert.equal(await page.evaluate(() => window.__xss), undefined);
+  const track = pedidos.find((p) => p.url.includes('action=track'));
+  assert.deepEqual(JSON.parse(track.corpo), { tracking_code: 'AL-TESTE1' });
+  assert.deepEqual(erros, []);
+  await context.close();
+});
+
+await teste('cartão público ?endereco= usa pesquisa?action=cartao', async () => {
+  const { page, context } = await abrir('?endereco=HB-01');
+  await page.waitForSelector('#endereco-conteudo .card');
+  const texto = await page.textContent('#endereco-conteudo');
+  assert.match(texto, /HB-01/);
+  assert.match(texto, /Rua A · Quadra Q1 · nº 12/);
+  assert.equal(await page.locator('#endereco-conteudo img').count(), 0);
+  await context.close();
+});
+
+await teste('QR da autenticação em dois passos: imagem data: é mostrada como imagem', async () => {
+  const { page, context } = await abrir();
+  const r = await page.evaluate(() => {
+    const box = document.createElement('div');
+    desenharQrMfa(box, { qr_code: 'data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg"></svg>', secret: 'S' });
+    const um = box.querySelector('img') && box.querySelector('img').getAttribute('src').slice(0, 19);
+    desenharQrMfa(box, { qr_code: '<svg onload="window.__xss=2"></svg>' });
+    return [um, box.querySelector('svg'), window.__xss];
+  });
+  assert.deepEqual(r, ['data:image/svg+xml;', null, undefined]);
+  await context.close();
+});
+
+await teste('entregaIdMorada só aceita UUID', async () => {
+  const { page, context } = await abrir();
+  const r = await page.evaluate(() => [entregaIdMorada({ address_id: 'CARD:abc' }), entregaIdMorada({}), entregaIdMorada({ address_id: 'aaaaaaaa-0000-4000-8000-000000000009' })]);
+  assert.deepEqual(r, [null, null, 'aaaaaaaa-0000-4000-8000-000000000009']);
+  await context.close();
+});
+
+await teste('fotos vão para a pasta da pessoa; recusa do servidor não finge que ficou guardada', async () => {
+  const { page, context } = await abrir();
+  await page.evaluate((t) => { window.session = { access_token: t, email: 't@exemplo.ao' }; }, TOKEN);
+  respostaStorage = { status: 200, body: { Key: 'ok' } };
+  const ok = await page.evaluate(() => uploadFotoComFallback(new Blob(['x'], { type: 'image/jpeg' }), 'delivery-proofs', 'pod/../x'));
+  assert.equal(ok.ok, true);
+  assert.match(ok.url, new RegExp(`^delivery-proofs/${UID}/pod-\\.\\.-x-[0-9a-f-]{36}\\.jpg$`));
+  const enviado = pedidos.filter((p) => p.url.includes('/storage/v1/object/delivery-proofs/')).pop();
+  assert.ok(enviado.url.includes(`/delivery-proofs/${UID}/`));
+  respostaStorage = { status: 400, body: { message: 'mime type not supported' } };
+  const recusa = await page.evaluate(() => uploadFotoComFallback(new Blob(['x']), 'field-photos', 'a'));
+  assert.equal(recusa.ok, false);
+  assert.match(recusa.erro, /recusou a foto \(mime type not supported\)/);
+  assert.equal(recusa.marcador, undefined);
+  respostaStorage = { status: 200, body: { Key: 'ok' } };
+  await context.close();
+});
+
+await teste('fila sem rede: favorito vai como create_favorite, o aparelho é registado e a recusa fica visível', async () => {
+  const { page, context } = await abrir();
+  await page.evaluate((t) => {
+    window.session = { access_token: t, email: 't@exemplo.ao' };
+    window.lastLocation = { lat: -12.77, lng: 15.73, plus_code: '6GXX+XX', postal_code: null, accuracy: 4 };
+    lastLocation = window.lastLocation;
+    guardarFavoritoNaFila();
+  }, TOKEN);
+  const antes = pedidos.length;
+  await page.evaluate(() => syncPendingOps());
+  await page.waitForFunction(() => !isSyncing, null, { timeout: 5000 });
+  const novos = pedidos.slice(antes);
+  const iRegisto = novos.findIndex((p) => p.url.includes('signing-keys'));
+  const iSync = novos.findIndex((p) => p.url.includes('/functions/v1/sync'));
+  assert.ok(iSync > -1, 'a sync foi chamada');
+  if (iRegisto > -1) assert.ok(iRegisto < iSync, 'regista o aparelho antes da sync');
+  const op = JSON.parse(novos[iSync].corpo).operations[0];
+  assert.equal(op.operation_type, 'create_favorite');
+  assert.match(op.operation_id, UUID);
+  assert.match(op.payload.address_id, UUID);
+  assert.equal(op.payload.address.latitude, -12.77);
+  const fila = await page.evaluate(() => getPendingOps());
+  assert.equal(fila.length, 1);
+  assert.equal(fila[0].ultimo_erro, 'recusada no teste');
+  await context.close();
+});
+
+await teste('pesquisa usa a função pesquisa e escapa o resultado', async () => {
+  const { page, context } = await abrir();
+  await page.evaluate((t) => { window.session = { access_token: t, email: 't@exemplo.ao' }; }, TOKEN);
+  await page.evaluate(() => {
+    const i = document.getElementById('search-input');
+    i.value = 'Rua X'; i.dispatchEvent(new Event('input'));
+  });
+  await page.waitForFunction(() => document.getElementById('search-results').textContent.includes('Rua X'), null, { timeout: 5000 });
+  assert.equal(await page.locator('#search-results img').count(), 0);
+  const p = pedidos.filter((x) => x.url.endsWith('/functions/v1/pesquisa')).pop();
+  assert.deepEqual(JSON.parse(p.corpo), { query: 'Rua X' });
+  assert.ok(!pedidos.some((x) => /functions\/v1\/(search|resolve-address|routing)(\?|$)/.test(x.url)));
+  await context.close();
+});
+
+await browser.close();
+servidor.close();
+if (falhas) { console.error(`${falhas} teste(s) falharam`); process.exit(1); }
+console.log('Todos os testes passaram.');

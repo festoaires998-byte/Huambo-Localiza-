@@ -1,56 +1,62 @@
-# Angola Localiza
+# Angola Localiza — site
 
-Plataforma de localização, endereçamento digital (Código Postal Digital) e logística para Angola.
+Site (PWA) do Angola Localiza: endereçamento digital (Código Postal Digital),
+mapa, entregas, levantamento de campo e painel de administração.
+A app Android/iOS está no repositório **Angola-Localiza-2.2**; o site e a app
+usam o **mesmo Supabase** e as **mesmas Edge Functions** (o código das funções
+vive no repositório da app, em `supabase/functions/`).
 
-## Estrutura do monorepo
+## O que está neste repositório
 
 ```
-apps/
-  web/         Next.js + TypeScript (site público, cartão de endereço, painel institucional)
-  mobile/      React Native + Expo + TypeScript (app principal, offline-first)
-  admin/       Painel institucional (pode ser rota dentro de web/ ou app separada — decidir na Fase de UI)
-  backend/     Lógica de negócio pesada que não cabe bem em Edge Functions (jobs, imports/exports, PostalCodeService)
-    src/modules/  Um módulo por domínio (auth, addresses, postal-codes, deliveries, field, sync, ...)
-packages/
-  shared-types/  Tipos TypeScript partilhados entre web, mobile e backend (schemas, DTOs)
-  ui/            Design system reutilizável (Button, Input, Map, AddressCard, QRCodeCard, StatusBadge, ...)
-supabase/
-  migrations/    Migrations SQL versionadas (schema + PostGIS + índices + RLS)
-  functions/     Edge Functions (Deno) — ex: geração de Código Postal Digital, geocoding proxy
-docs/            Arquitetura, decisões técnicas, runbooks
-.github/workflows/  CI/CD (lint, testes, migrations, deploy)
+index.html        O site inteiro (HTML + CSS + JavaScript, sem build)
+sw.js             Service worker (funciona sem rede; mudar CACHE_NAME a cada versão)
+version.json      Versão publicada (o site avisa quando há uma nova)
+manifest.json     PWA (ícones, nome)
+supabase/migrations/  Migrações antigas (as novas estão no repositório da app)
+tests/smoke.mjs   Testes num navegador verdadeiro, com o Supabase simulado
+docs/             Arquitetura e roadmap
+.github/workflows/ci.yml            Verificações automáticas (ver abaixo)
+.github/workflows/publish-pages.yml Publicação no GitHub Pages (a partir de main)
 ```
 
-## Stack
+## Regras que o site segue (iguais às da app)
 
-- **Frontend web:** Next.js + TypeScript
-- **Mobile:** React Native + Expo + TypeScript, SQLite offline-first
-- **Backend/lógica de negócio:** Supabase Edge Functions (Deno) para o essencial; serviço Node/NestJS à parte só se/quando a lógica não couber em Edge Functions (ex: jobs pesados de import/export)
-- **Base de dados:** Supabase (PostgreSQL + PostGIS)
-- **Auth:** Supabase Auth (access/refresh token nativo, MFA para admins)
-- **Storage:** Supabase Storage (fotos de entregas, cartões exportados, placas)
-- **CI/CD:** GitHub Actions
+- **Fotos e documentos** vão sempre para a pasta de quem envia:
+  `field-photos/<id>/…`, `delivery-proofs/<id>/…`, `kyc-artifacts/<id>/…`,
+  `chat-media/<id>/…`. Os buckets são privados; o servidor devolve links
+  temporários para ver os ficheiros.
+- **Pesquisa**: função `pesquisa` (e `pesquisa?action=cartao` para o link
+  público `?endereco=`). As funções antigas `search` e `resolve-address`
+  estão desligadas.
+- **Rastreio público** (`?rastreio=`): `deliveries?action=track`, sem sessão;
+  só mostra o estado, as datas e a zona do destino.
+- **Preços**: `pricing?action=quote` / `list_zones` / `admin_update_zone`
+  (tabela `country_pricing_zones`, por país).
+- **Rotas**: `geocode?action=optimize` (LocationIQ).
+- **Sem rede**: a fila usa `create_favorite`, `create_delivery`,
+  `field_submit`, `delivery_proof`; o navegador regista-se (`signing-keys`)
+  antes de sincronizar. O código de rastreio e o PIN de uma entrega só
+  existem depois de o servidor a criar.
+- Todo o texto que vem do servidor passa por `esc()` antes de ir para a página.
+- As funções são chamadas com a sessão (`cabecalhosFuncao()`), nunca só com a
+  chave pública. **Nunca** usar a service role key no site.
 
-Ver `docs/ARQUITETURA.md` para as decisões detalhadas e justificação de cada escolha.
+## Verificações automáticas (CI)
 
-## Setup local
+- HTML válido e `node --check` em cada bloco `<script>`.
+- Proíbe o uso das funções desligadas, links públicos para buckets privados
+  e qualquer menção à service role key.
+- `node tests/smoke.mjs`: abre o site no Chromium (Playwright) com o
+  Supabase simulado e testa o rastreio, o cartão público, a pesquisa, os
+  envios de fotos, a fila sem rede e a proteção contra HTML malicioso.
+
+Para correr os testes localmente:
 
 ```bash
-# 1. Instalar dependências (quando os package.json existirem em cada app)
-npm install
-
-# 2. Configurar Supabase local
-npx supabase init
-npx supabase start
-
-# 3. Aplicar migrations
-npx supabase db push
-
-# 4. Copiar variáveis de ambiente
-cp environment.example .env
+npm install --no-save playwright@1.56.1
+npx playwright install chromium
+node tests/smoke.mjs
 ```
 
-## Estado do projeto
-
-Fase atual: **Fase 0/1 — arquitetura e estrutura do repositório.**
-Ver `docs/ROADMAP.md` para a ordem completa das fases.
+Ver `docs/ROADMAP.md` para o estado de cada parte.

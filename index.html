@@ -259,7 +259,7 @@
 </head>
 <body>
 <script>
-var APP_BUILD_ID = "20260926-101500";
+var APP_BUILD_ID = "20260930-sintonia-app";
 (function verificarVersaoPublicada(){
   var aviso=null, checking=false;
   function check(){
@@ -355,6 +355,10 @@ var APP_BUILD_ID = "20260926-101500";
       <div class="segmented" style="margin-bottom: var(--sp-4);">
         <button id="tab-signin" class="active">Entrar</button>
         <button id="tab-signup">Criar conta</button>
+      </div>
+      <div id="signup-name-field" class="field" style="display:none;">
+        <label>Nome completo</label>
+        <input id="input-full-name" class="input" type="text" autocomplete="name" placeholder="Ex.: Maria Kiala" maxlength="120" />
       </div>
       <div class="field">
         <label>Email</label>
@@ -799,6 +803,7 @@ var APP_BUILD_ID = "20260926-101500";
         <div class="btn-row" style="margin-top:var(--sp-4);">
           <button id="btn-partilhar-entrega" class="btn btn-primary btn-sm">📤 Partilhar</button>
           <button id="btn-copiar-entrega" class="btn btn-secondary btn-sm">Copiar código</button>
+          <button id="btn-ver-pin-entrega" class="btn btn-secondary btn-sm" style="display:none;">Ver PIN</button>
         </div>
         <p id="entrega-share-msg" class="msg msg-success" style="margin-top:var(--sp-2);"></p>
       </div>
@@ -813,6 +818,7 @@ var APP_BUILD_ID = "20260926-101500";
           </div>
           <button id="btn-estafeta-disponiveis-refresh" class="btn btn-secondary btn-sm">↻ Atualizar</button>
         </div>
+        <button id="btn-estafeta-online" class="btn btn-primary" style="margin-top:var(--sp-3);display:none;">Ficar disponível</button>
         <div id="estafeta-disponiveis-list" class="stack-sm" style="margin-top:var(--sp-3);"></div>
         <div id="estafeta-disponiveis-empty" class="empty-state" style="display:none;padding:10px 0;">
           <div class="desc" style="margin:0;">Não há pedidos disponíveis neste momento.</div>
@@ -1135,6 +1141,14 @@ var APP_BUILD_ID = "20260926-101500";
             <button id="btn-joinlink-criar" class="btn btn-primary">🔗 Gerar link</button>
             <p id="joinlink-msg" class="msg" style="margin-top:6px;"></p>
             <div id="joinlink-list" class="stack-sm" style="margin-top:var(--sp-3);"></div>
+          </div>
+        </details>
+
+        <details class="admin-collapsible" open>
+          <summary>🏍️ Candidaturas de motorista</summary>
+          <div class="admin-collapsible-body">
+            <p id="motoristas-msg" class="msg"></p>
+            <div id="motoristas-list" class="stack-sm"></div>
           </div>
         </details>
 
@@ -1467,6 +1481,25 @@ Erros: 400 validação · 401 chave inválida · 403 escopo insuficiente · 404 
 var SUPABASE_URL = "https://qntbknegicaghnbnghyw.supabase.co";
 var ANON_KEY = "sb_publishable_9RypatlYEYRmx8kRnyNS-A_ZRLMgl_a";
 var session = null;
+
+// Segurança: todo o texto que vem do servidor ou de outras pessoas (nomes,
+// instruções, referências, mensagens, erros) passa por esc() antes de ir para
+// innerHTML. Sem isto, um nome como <img onerror=...> corria código no
+// telemóvel de quem o via (e podia roubar a sessão guardada no navegador).
+function esc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, function(ch) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+  });
+}
+/** Só links https (links assinados do Storage); qualquer outra coisa fica vazia. */
+function urlSegura(u) {
+  u = String(u || '');
+  return /^https:\/\//i.test(u) ? esc(u) : '';
+}
+/** Cabeçalhos para as Edge Functions: sempre com a sessão (as funções com verify_jwt recusam a chave pública sozinha). */
+function cabecalhosFuncao() {
+  return { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + (session && session.access_token ? session.access_token : ANON_KEY) };
+}
 var alRealtimeClient = null;
 var realtimeDeliveryChannels = {};
 var realtimeDeliveryRetryTimers = {};
@@ -1528,7 +1561,7 @@ async function inicializarMapasOfflineSite() {
   lista.innerHTML='';
   MAPAS_OFFLINE_PALOP.forEach(item=>{
     const row=document.createElement('div'); row.className='card'; row.style.margin='0 0 8px';
-    row.innerHTML='<div style="font-weight:700">'+item.nome+'</div><div class="msg msg-muted" data-status>A verificar…</div><button class="btn btn-secondary btn-sm" data-download>📥 Descarregar mapa</button>';
+    row.innerHTML='<div style="font-weight:700">'+esc(item.nome)+'</div><div class="msg msg-muted" data-status>A verificar…</div><button class="btn btn-secondary btn-sm" data-download>📥 Descarregar mapa</button>';
     const status=row.querySelector('[data-status]'), btn=row.querySelector('[data-download]');
     btn.addEventListener('click',()=>mapaOfflineDescarregar(item,btn,status));
     lista.appendChild(row);
@@ -1870,7 +1903,12 @@ function getCurrentUserId() {
 }
 function makeOperationId() {
   if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
-  return 'op-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+  var b = new Uint8Array(16);
+  if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(b);
+  else for (var i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
+  b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+  var h = Array.prototype.map.call(b, function(x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+  return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
 }
 
 function guardarSessaoLocal(refreshToken) {
@@ -1974,6 +2012,8 @@ function setMode(m) {
   tabSignup.classList.toggle('active', m === 'signup');
   btnSubmit.textContent = m === 'signin' ? 'Entrar' : 'Criar conta';
   if (signupCountryField) signupCountryField.style.display = m === 'signup' ? 'block' : 'none';
+  var signupNameField = document.getElementById('signup-name-field');
+  if (signupNameField) signupNameField.style.display = m === 'signup' ? 'block' : 'none';
   if (m === 'signup') carregarPaisesSignup();
   authMsg.textContent = ''; authMsg.className = 'msg';
 }
@@ -2018,22 +2058,23 @@ function carregarChat() {
   }).then(function(r) { return r.json(); }).then(function(data) {
     if (!chatAtual) return;
     var box = document.getElementById('chat-mensagens');
-    if (data.error) { box.innerHTML = '<p class="msg msg-error" style="text-align:center;">' + data.error + '</p>'; return; }
+    if (data.error) { box.innerHTML = '<p class="msg msg-error" style="text-align:center;">' + esc(data.error) + '</p>'; return; }
     var estavaNoFim = (box.scrollTop + box.clientHeight) >= (box.scrollHeight - 40);
     box.innerHTML = (data.messages || []).map(function(m) {
       var when = new Date(m.created_at).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
       var mediaHtml = '';
-      if (m.media_url && m.media_type === 'image') mediaHtml = '<img src="' + m.media_url + '" style="max-width:100%;border-radius:8px;display:block;margin-bottom:' + (m.body ? '6px' : '0') + ';" />';
-      if (m.media_url && m.media_type === 'video') mediaHtml = '<video src="' + m.media_url + '" controls style="max-width:100%;border-radius:8px;display:block;margin-bottom:' + (m.body ? '6px' : '0') + ';"></video>';
+      var mediaUrl = urlSegura(m.media_url);
+      if (mediaUrl && m.media_type === 'image') mediaHtml = '<img src="' + mediaUrl + '" style="max-width:100%;border-radius:8px;display:block;margin-bottom:' + (m.body ? '6px' : '0') + ';" />';
+      if (mediaUrl && m.media_type === 'video') mediaHtml = '<video src="' + mediaUrl + '" controls style="max-width:100%;border-radius:8px;display:block;margin-bottom:' + (m.body ? '6px' : '0') + ';"></video>';
       if (m.is_announcement) {
         return '<div style="background:var(--accent-dim);border:1px solid var(--accent);border-radius:var(--radius-sm);padding:10px 12px;">' +
-          '<div style="font-size:10.5px;color:var(--accent);font-weight:700;">📢 COMUNICADO · ' + (m.sender_email || '') + ' · ' + when + '</div>' +
-          '<div style="font-size:13.5px;margin-top:4px;">' + mediaHtml + (m.body ? m.body.replace(/</g, '&lt;') : '') + '</div></div>';
+          '<div style="font-size:10.5px;color:var(--accent);font-weight:700;">📢 COMUNICADO · ' + esc(m.sender_email || '') + ' · ' + esc(when) + '</div>' +
+          '<div style="font-size:13.5px;margin-top:4px;">' + mediaHtml + esc(m.body || '') + '</div></div>';
       }
       var meu = m.sou_eu;
       return '<div style="align-self:' + (meu ? 'flex-end' : 'flex-start') + ';max-width:80%;">' +
-        (!meu ? '<div style="font-size:10px;color:var(--text-faint);margin-bottom:2px;">' + (m.sender_email || '') + '</div>' : '') +
-        '<div style="background:' + (meu ? 'var(--accent)' : 'var(--surface-2)') + ';color:' + (meu ? '#FBF6EE' : 'var(--text)') + ';border-radius:var(--radius-sm);padding:8px 12px;font-size:13.5px;">' + mediaHtml + (m.body ? m.body.replace(/</g, '&lt;') : '') + '</div>' +
+        (!meu ? '<div style="font-size:10px;color:var(--text-faint);margin-bottom:2px;">' + esc(m.sender_email || '') + '</div>' : '') +
+        '<div style="background:' + (meu ? 'var(--accent)' : 'var(--surface-2)') + ';color:' + (meu ? '#FBF6EE' : 'var(--text)') + ';border-radius:var(--radius-sm);padding:8px 12px;font-size:13.5px;">' + mediaHtml + esc(m.body || '') + '</div>' +
         '<div style="font-size:9.5px;color:var(--text-faint);margin-top:2px;text-align:' + (meu ? 'right' : 'left') + ';">' + when + '</div></div>';
     }).join('') || '<p class="msg msg-muted" style="text-align:center;">Ainda sem mensagens.</p>';
     if (estavaNoFim) box.scrollTop = box.scrollHeight;
@@ -2056,13 +2097,16 @@ document.getElementById('chat-anexo-input').addEventListener('change', function(
   status.className = 'msg msg-muted'; status.textContent = 'A processar...';
 
   function enviarBlob(blob, tipo, extensao) {
-    var fileName = 'chat-' + Date.now() + '.' + extensao;
+    var uid = getCurrentUserId();
+    if (!uid) { status.className = 'msg msg-error'; status.textContent = 'Sessão expirada — entra novamente.'; return; }
+    extensao = String(extensao || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || (tipo === 'video' ? 'mp4' : 'jpg');
+    var fileName = uid + '/chat-' + Date.now() + '.' + extensao;
     status.textContent = 'A enviar (' + Math.round(blob.size / 1024) + ' KB)...';
     fetch(SUPABASE_URL + '/storage/v1/object/chat-media/' + fileName, {
       method: 'POST', headers: { 'Authorization': 'Bearer ' + session.access_token, 'apikey': ANON_KEY, 'Content-Type': blob.type || (tipo === 'video' ? 'video/mp4' : 'image/jpeg') }, body: blob
     }).then(function(r) {
       if (r.ok) {
-        chatAnexoPendente = { url: SUPABASE_URL + '/storage/v1/object/public/chat-media/' + fileName, type: tipo };
+        chatAnexoPendente = { url: 'chat-media/' + fileName, type: tipo };
         status.className = 'msg msg-success'; status.textContent = (tipo === 'video' ? '🎥 Vídeo' : '📷 Foto') + ' pronto a enviar.';
       } else { status.className = 'msg msg-error'; status.textContent = 'Erro ao enviar.'; }
     }).catch(function() { status.className = 'msg msg-error'; status.textContent = 'Erro de ligação.'; });
@@ -2118,7 +2162,7 @@ function abrirMeusCanaisDeOrganizacao(tipoDesejado) {
     document.getElementById('btn-chat-enviar').style.display = 'none';
     document.getElementById('chat-comunicado-label').style.display = 'none';
     document.getElementById('chat-mensagens').innerHTML = canais.map(function(c, i) {
-      return '<button class="btn btn-secondary chat-escolher-canal-btn" data-i="' + i + '" style="text-align:left;">' + c.titulo + '</button>';
+      return '<button class="btn btn-secondary chat-escolher-canal-btn" data-i="' + i + '" style="text-align:left;">' + esc(c.titulo) + '</button>';
     }).join('');
     document.querySelectorAll('.chat-escolher-canal-btn').forEach(function(b) {
       b.addEventListener('click', function() {
@@ -2196,22 +2240,23 @@ var pendingTrackingCode = new URLSearchParams(location.search).get('rastreio');
 if (pendingTrackingCode) {
   document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('visible'); });
   document.getElementById('view-rastreio-publico').classList.add('visible');
+  // Rastreio público (deliveries v21, sem sessão): só o estado, as datas e a zona do destino.
   fetch(SUPABASE_URL + '/functions/v1/deliveries?action=track', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY }, body: JSON.stringify({ tracking_code: pendingTrackingCode })
   }).then(function(r) { return r.json(); }).then(function(data) {
     var box = document.getElementById('rastreio-conteudo');
-    if (data.error) { box.innerHTML = '<p class="msg msg-error" style="text-align:center;">' + data.error + '</p>'; return; }
+    if (data.error) { box.innerHTML = '<p class="msg msg-error" style="text-align:center;">' + esc(data.error === 'codigo de rastreio invalido' ? 'Este código de rastreio não é válido.' : data.error) + '</p>'; return; }
     var html = '<div class="card" style="text-align:center;">' +
       '<div class="label-caps">Código de rastreio</div>' +
-      '<div class="value-md">' + data.tracking_code + '</div>' +
-      (data.postal_code ? '<div class="label-caps" style="margin-top:var(--sp-3);">Destino</div><div class="value-plain" style="color:var(--accent);">' + data.postal_code + '</div>' : '') +
+      '<div class="value-md">' + esc(data.tracking_code) + '</div>' +
+      (data.destination_area ? '<div class="label-caps" style="margin-top:var(--sp-3);">Destino</div><div class="value-plain" style="color:var(--accent);">' + esc(data.destination_area) + '</div>' : '') +
       '<div class="label-caps" style="margin-top:var(--sp-3);">Estado atual</div>' +
-      '<div class="value-plain" style="font-size:16px;font-weight:700;">' + (TRACK_STATUS_LABEL[data.status] || data.status) + '</div>' +
+      '<div class="value-plain" style="font-size:16px;font-weight:700;">' + esc(TRACK_STATUS_LABEL[data.status] || data.status) + '</div>' +
       '</div>';
     html += '<div class="label-caps" style="margin-top:var(--sp-4);margin-bottom:var(--sp-2);">Histórico</div>';
     (data.history || []).forEach(function(h) {
       var when = new Date(h.created_at).toLocaleString('pt-PT');
-      html += '<div class="list-item"><div class="value-plain">' + (TRACK_STATUS_LABEL[h.status] || h.status) + '</div><div style="font-size:11px;color:var(--text-dim);margin-top:2px;">' + when + '</div></div>';
+      html += '<div class="list-item"><div class="value-plain">' + esc(TRACK_STATUS_LABEL[h.status] || h.status) + '</div><div style="font-size:11px;color:var(--text-dim);margin-top:2px;">' + esc(when) + '</div></div>';
     });
     box.innerHTML = html;
   }).catch(function() { document.getElementById('rastreio-conteudo').innerHTML = '<p class="msg msg-error" style="text-align:center;">Erro de ligação.</p>'; });
@@ -2221,12 +2266,14 @@ document.getElementById('btn-rastreio-voltar').addEventListener('click', functio
 });
 
 function renderizarMoradaPublica(box, a) {
-  var linha = a.streets ? a.streets.name + (a.quadras ? ' · Quadra ' + a.quadras.code : '') + (a.house_number ? ' · nº ' + a.house_number : '') : '';
+  var rua = a.rua || (a.streets && a.streets.name) || '';
+  var quadra = a.quadra || (a.quadras && a.quadras.code) || '';
+  var linha = rua ? rua + (quadra ? ' · Quadra ' + quadra : '') + (a.house_number ? ' · nº ' + a.house_number : '') : '';
   box.innerHTML = '<div class="card" style="text-align:center;">' +
-    '<div class="label-caps">Código postal digital</div><div class="value-md">' + a.postal_code + '</div>' +
-    (a.plus_code ? '<div class="label-caps" style="margin-top:var(--sp-3);">Plus Code</div><div class="value-plain" style="color:var(--accent);">' + a.plus_code + '</div>' : '') +
-    (linha ? '<div class="label-caps" style="margin-top:var(--sp-3);">Morada</div><div class="value-plain">' + linha + '</div>' : '') +
-    (a.reference ? '<div class="label-caps" style="margin-top:var(--sp-3);">Referência</div><div class="value-plain">' + a.reference + '</div>' : '') +
+    '<div class="label-caps">Código postal digital</div><div class="value-md">' + esc(a.postal_code || '—') + '</div>' +
+    (a.plus_code ? '<div class="label-caps" style="margin-top:var(--sp-3);">Plus Code</div><div class="value-plain" style="color:var(--accent);">' + esc(a.plus_code) + '</div>' : '') +
+    (linha ? '<div class="label-caps" style="margin-top:var(--sp-3);">Morada</div><div class="value-plain">' + esc(linha) + '</div>' : '') +
+    (a.reference ? '<div class="label-caps" style="margin-top:var(--sp-3);">Referência</div><div class="value-plain">' + esc(a.reference) + '</div>' : '') +
     '</div>';
 }
 
@@ -2234,11 +2281,12 @@ var pendingEnderecoQuery = new URLSearchParams(location.search).get('endereco');
 if (pendingEnderecoQuery) {
   document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('visible'); });
   document.getElementById('view-endereco-publico').classList.add('visible');
-  fetch(SUPABASE_URL + '/functions/v1/resolve-address', {
+  // Cartão público (pesquisa?action=cartao, sem sessão): só com o código postal ou o Plus Code completos.
+  fetch(SUPABASE_URL + '/functions/v1/pesquisa?action=cartao', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY }, body: JSON.stringify({ query: pendingEnderecoQuery })
   }).then(function(r) { return r.json(); }).then(function(data) {
     var box = document.getElementById('endereco-conteudo');
-    if (!data.found) { box.innerHTML = '<p class="msg msg-error" style="text-align:center;">Não encontrei nenhuma morada com esse código.</p>'; return; }
+    if (!data.found) { box.innerHTML = '<p class="msg msg-error" style="text-align:center;">Não encontrei nenhuma morada pública com esse código.</p>'; return; }
     renderizarMoradaPublica(box, data.address);
   }).catch(function() { document.getElementById('endereco-conteudo').innerHTML = '<p class="msg msg-error" style="text-align:center;">Erro de ligação.</p>'; });
 }
@@ -2340,7 +2388,9 @@ function renderMainApp() {
   loadEntregaDestinos();
   checkAdmin();
   updateOfflineStatus();
-  syncPendingOps();
+  // A sync só aceita operações de aparelhos registados: regista este navegador
+  // logo ao entrar (a chave fica guardada) e depois envia a fila.
+  garantirChaveAssinaturaRegistada().catch(function() { return null; }).then(function() { syncPendingOps(); });
 }
 
 function startForcedMfaEnroll() {
@@ -2357,9 +2407,7 @@ function startForcedMfaEnroll() {
     forcedMfaFactorId = data.id;
     var qrBox = document.getElementById('mfa-forced-qr');
     qrBox.innerHTML = '';
-    var qrContent = (data.totp && (data.totp.qr_code || data.totp.uri)) || '';
-    if (qrContent.indexOf('<svg') === 0) qrBox.innerHTML = qrContent;
-    else if (qrContent) { try { new QRCode(qrBox, { text: qrContent, width: 160, height: 160, colorDark: '#181818', colorLight: '#ffffff' }); wireQrActions('qr-code', 'btn-guardar-qr-mapa', 'btn-partilhar-qr-mapa', 'codigo-postal-angola-localiza.png'); } catch (e) {} }
+    desenharQrMfa(qrBox, data.totp);
     document.getElementById('mfa-forced-secret').textContent = (data.totp && data.totp.secret) || '';
     msg.textContent = '';
     return fetch(SUPABASE_URL + '/auth/v1/factors/' + forcedMfaFactorId + '/challenge', {
@@ -2384,6 +2432,26 @@ document.getElementById('btn-mfa-forced-verify').addEventListener('click', funct
   }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
 });
 document.getElementById('btn-mfa-forced-logout').addEventListener('click', function() { limparSessaoLocal(); session = null; location.reload(); });
+
+// O Supabase devolve o QR da autenticação em dois passos como imagem
+// ("data:image/svg+xml;..."): mostra-se como imagem. Se só vier o endereço
+// otpauth://, desenha-se o QR a partir dele. A chave manual fica sempre visível.
+function desenharQrMfa(qrBox, totp) {
+  qrBox.innerHTML = '';
+  var imagem = totp && typeof totp.qr_code === 'string' ? totp.qr_code : '';
+  var uri = totp && typeof totp.uri === 'string' ? totp.uri : '';
+  if (/^data:image\/(svg\+xml|png)/.test(imagem)) {
+    var img = document.createElement('img');
+    img.src = imagem; img.alt = 'Código QR para a app de autenticação'; img.width = 180; img.height = 180;
+    img.style.background = '#fff'; img.style.padding = '6px';
+    qrBox.appendChild(img);
+    return;
+  }
+  if (uri) {
+    try { new QRCode(qrBox, { text: uri, width: 180, height: 180, colorDark: '#181818', colorLight: '#ffffff' }); return; } catch (e) {}
+  }
+  qrBox.innerHTML = '<p style="color:#333;font-size:11px;padding:8px;">Não foi possível desenhar o QR — usa a chave manual abaixo.</p>';
+}
 
 function qrBoxToBlob(qrBoxId, callback) {
   var box = document.getElementById(qrBoxId);
@@ -2508,6 +2576,12 @@ btnSubmit.addEventListener('click', function() {
   var email = document.getElementById('input-email').value.trim();
   var password = document.getElementById('input-password').value;
   var countryCode = inputCountry ? inputCountry.value : '';
+  var fullName = (document.getElementById('input-full-name').value || '').trim().replace(/\s+/g, ' ');
+  if (mode === 'signup' && fullName.length < 3) {
+    authMsg.className = 'msg msg-error';
+    authMsg.textContent = 'Escreve o teu nome completo.';
+    return;
+  }
   if (mode === 'signup' && !countryCode) {
     authMsg.className = 'msg msg-error';
     authMsg.textContent = 'Seleciona o país para criar a conta.';
@@ -2518,7 +2592,7 @@ btnSubmit.addEventListener('click', function() {
   var redirectTo = encodeURIComponent(window.location.origin + window.location.pathname);
   var endpoint = mode === 'signin' ? SUPABASE_URL + '/auth/v1/token?grant_type=password' : SUPABASE_URL + '/auth/v1/signup?redirect_to=' + redirectTo;
   fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY }, body: JSON.stringify(mode === 'signup'
-      ? { email: email, password: password, data: { country_code: countryCode } }
+      ? { email: email, password: password, data: { country_code: countryCode, full_name: fullName } }
       : { email: email, password: password }) })
     .then(function(r) { return r.json().then(function(data) { return { status: r.status, data: data }; }); })
     .then(function(res) {
@@ -2618,8 +2692,8 @@ function loadNotifications() {
       var div = document.createElement('div');
       div.className = 'list-item';
       div.style.opacity = n.read_at ? '0.6' : '1';
-      div.innerHTML = '<div class="value-plain">' + n.title + '</div>' +
-        (n.body ? '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">' + n.body + '</div>' : '') +
+      div.innerHTML = '<div class="value-plain">' + esc(n.title) + '</div>' +
+        (n.body ? '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">' + esc(n.body) + '</div>' : '') +
         '<div style="font-size:10.5px;color:var(--text-faint);margin-top:4px;">' + new Date(n.created_at).toLocaleString('pt-PT') + '</div>';
       if (!n.read_at) {
         div.style.cursor = 'pointer';
@@ -2678,20 +2752,8 @@ document.getElementById('btn-mfa-start').addEventListener('click', function() {
     mfaFactorId = data.id;
     var qrBox = document.getElementById('mfa-qr');
     qrBox.innerHTML = '';
-    var qrContent = (data.totp && (data.totp.qr_code || data.totp.uri)) || '';
-    if (qrContent.indexOf('<svg') === 0) {
-      qrBox.innerHTML = qrContent;
-    } else if (qrContent) {
-      try {
-        new QRCode(qrBox, { text: qrContent, width: 160, height: 160, colorDark: '#181818', colorLight: '#ffffff' });
-        wireQrActions('qr-code', 'btn-guardar-qr-mapa', 'btn-partilhar-qr-mapa', 'codigo-postal-angola-localiza.png');
-      } catch (qrErr) {
-        qrBox.innerHTML = '<p style="color:#333;font-size:11px;padding:8px;">Não foi possível desenhar o QR — usa a chave manual abaixo.</p>';
-      }
-    } else {
-      qrBox.innerHTML = '<p style="color:#333;font-size:11px;padding:8px;">Sem QR — usa a chave manual abaixo na app.</p>';
-    }
-    document.getElementById('mfa-secret').textContent = (data.totp && data.totp.secret) || JSON.stringify(data).slice(0, 200);
+    desenharQrMfa(qrBox, data.totp);
+    document.getElementById('mfa-secret').textContent = (data.totp && data.totp.secret) || '';
     document.getElementById('mfa-not-enrolled').style.display = 'none';
     document.getElementById('mfa-enroll-box').style.display = 'block';
     msg.textContent = '';
@@ -2938,16 +3000,32 @@ function contarFotosOffline() {
 
 // Tenta enviar a foto já; se falhar (sem rede), guarda-a no telemóvel em vez de bloquear.
 // Devolve sempre algo utilizável: { ok:true, url } ou { ok:false, marcador: 'offline:<id>' }.
+// Envia a foto para <bucket>/<id da pessoa>/<nome> (os buckets são privados e
+// só aceitam ficheiros na pasta de quem envia) e devolve o caminho
+// "<bucket>/<id>/<nome>", que é o que as funções do servidor aceitam.
+// Sem rede: guarda a foto no telemóvel (marcador "offline:<id>").
+// Se o servidor RECUSAR a foto (ex.: tipo ou tamanho): devolve { erro } —
+// não finge que ficou guardada para mais tarde.
+function nomeFicheiroSeguro(prefixo) {
+  return String(prefixo || 'foto').replace(/[^A-Za-z0-9._-]/g, '-').slice(0, 80);
+}
 function uploadFotoComFallback(blob, bucket, prefixo, contentType) {
-  var fileName = prefixo + '-' + makeOperationId() + (contentType === 'image/png' ? '.png' : '.jpg');
-  return fetch(SUPABASE_URL + '/storage/v1/object/' + bucket + '/' + fileName, {
+  var uid = getCurrentUserId();
+  if (!uid) return Promise.resolve({ ok: false, erro: 'Sessão expirada — entra novamente.' });
+  var caminho = uid + '/' + nomeFicheiroSeguro(prefixo) + '-' + makeOperationId() + (contentType === 'image/png' ? '.png' : '.jpg');
+  function guardarLocal() {
+    return guardarFotoOffline(blob, bucket, contentType).then(function(id) { return { ok: false, marcador: 'offline:' + id }; });
+  }
+  if (!navigator.onLine) return guardarLocal();
+  return fetch(SUPABASE_URL + '/storage/v1/object/' + bucket + '/' + caminho, {
     method: 'POST', headers: { 'Authorization': 'Bearer ' + session.access_token, 'apikey': ANON_KEY, 'Content-Type': contentType || 'image/jpeg' }, body: blob
   }).then(function(r) {
-    if (!r.ok) throw new Error('upload falhou');
-    return { ok: true, url: SUPABASE_URL + '/storage/v1/object/public/' + bucket + '/' + fileName };
-  }).catch(function() {
-    return guardarFotoOffline(blob, bucket, contentType).then(function(id) { return { ok: false, marcador: 'offline:' + id }; });
-  });
+    if (r.ok) return { ok: true, url: bucket + '/' + caminho };
+    if (r.status >= 500) return guardarLocal();
+    return r.json().catch(function() { return {}; }).then(function(d) {
+      return { ok: false, erro: 'O servidor recusou a foto' + (d && d.message ? ' (' + d.message + ')' : '') + '. Tira outra.' };
+    });
+  }, guardarLocal);
 }
 
 // Antes de enviar uma operação em fila, troca qualquer marcador 'offline:<id>' pela foto
@@ -2956,12 +3034,12 @@ function resolverUmaFotoOffline(marcador) {
   var id = marcador.slice('offline:'.length);
   return lerFotoOffline(id).then(function(registo) {
     if (!registo) throw new Error('foto offline não encontrada');
-    var fileName = 'offline-' + id + (registo.contentType === 'image/png' ? '.png' : '.jpg');
+    var fileName = getCurrentUserId() + '/offline-' + id + (registo.contentType === 'image/png' ? '.png' : '.jpg');
     return fetch(SUPABASE_URL + '/storage/v1/object/' + registo.bucket + '/' + fileName, {
       method: 'POST', headers: { 'Authorization': 'Bearer ' + session.access_token, 'apikey': ANON_KEY, 'Content-Type': registo.contentType }, body: registo.blob
     }).then(function(r) {
       if (!r.ok) throw new Error('falha ao enviar foto guardada');
-      return apagarFotoOffline(id).then(function() { return SUPABASE_URL + '/storage/v1/object/public/' + registo.bucket + '/' + fileName; });
+      return apagarFotoOffline(id).then(function() { return registo.bucket + '/' + fileName; });
     });
   });
 }
@@ -3043,7 +3121,10 @@ function updateOfflineStatus() {
       statusEl.className = 'msg msg-error'; statusEl.textContent = 'Sem ligação — ' + pending.length + ' operação(ões) por sincronizar' + fotosTxt + '.';
       btnSync.style.display = 'none';
     } else if (pending.length > 0) {
-      statusEl.className = 'msg msg-muted'; statusEl.textContent = pending.length + ' operação(ões) por sincronizar' + fotosTxt + '.';
+      var recusadas = pending.filter(function(op) { return op.ultimo_erro; });
+      statusEl.className = recusadas.length ? 'msg msg-error' : 'msg msg-muted';
+      statusEl.textContent = pending.length + ' operação(ões) por sincronizar' + fotosTxt + '.' +
+        (recusadas.length ? ' ' + recusadas.length + ' recusada(s) pelo servidor — última: "' + recusadas[recusadas.length - 1].ultimo_erro + '". Toca em Sincronizar para tentar outra vez.' : '');
       btnSync.style.display = 'block';
     } else {
       statusEl.className = 'msg msg-success'; statusEl.textContent = 'Tudo sincronizado.';
@@ -3071,15 +3152,26 @@ function syncPendingOps() {
 
   Promise.all(tarefasFotos).then(function() {
     if (prontos.length === 0) { updateOfflineStatus(); isSyncing = false; return; }
-    fetch(SUPABASE_URL + '/functions/v1/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
-      body: JSON.stringify({ operations: prontos })
+    // A sync só aceita operações de aparelhos registados por esta conta.
+    return garantirChaveAssinaturaRegistada().catch(function() { return null; }).then(function() {
+      return fetch(SUPABASE_URL + '/functions/v1/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+        body: JSON.stringify({ operations: prontos.map(function(op) {
+          return { operation_id: op.operation_id, device_id: op.device_id || DEVICE_ID, created_at: op.created_at, operation_type: op.operation_type, payload: op.payload };
+        }) })
+      });
     }).then(function(r) { return r.json(); }).then(function(data) {
       var results = data.results || [];
-      var reallyPending = ops.filter(function(op) {
+      var reallyPending = [];
+      ops.forEach(function(op) {
         var result = results.find(function(r) { return r.operation_id === op.operation_id; });
-        return !result || result.status === 'FAILED';
+        if (!result) { reallyPending.push(op); return; }
+        if (result.status === 'FAILED') {
+          op.tentativas = (op.tentativas || 0) + 1;
+          op.ultimo_erro = String(result.error || 'recusada pelo servidor');
+          reallyPending.push(op);
+        }
       });
       savePendingOps(reallyPending);
       updateOfflineStatus();
@@ -3277,7 +3369,7 @@ btn.addEventListener('click', function() {
         var partesLocalizacao = [province, municipality, comuna].filter(Boolean);
         document.getElementById('province-value').textContent = partesLocalizacao.length ? partesLocalizacao.join(', ') : 'não identificada';
         return fetch(SUPABASE_URL + '/functions/v1/generate-postal-code', {
-          method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY },
+          method: 'POST', headers: cabecalhosFuncao(),
           body: JSON.stringify({ latitude: lat, longitude: lng, province_name: province })
         });
       })
@@ -3344,6 +3436,21 @@ function stopScanner() {
 }
 document.getElementById('btn-scan-cancelar').addEventListener('click', stopScanner);
 
+// Guarda o favorito na fila sem rede. A sync cria a morada (por validar) com
+// este address_id e depois o favorito — o mesmo formato que a app usa.
+function guardarFavoritoNaFila() {
+  queuePendingOp('create_favorite', {
+    address_id: makeOperationId(),
+    category: document.getElementById('favorite-category').value,
+    address: {
+      latitude: lastLocation.lat, longitude: lastLocation.lng,
+      plus_code: lastLocation.plus_code || null, postal_code: lastLocation.postal_code || null,
+      accuracy_meters: lastLocation.accuracy != null ? Number(lastLocation.accuracy) : null,
+      visibility_level: document.getElementById('favorite-visibility').value
+    }
+  });
+}
+
 document.getElementById('btn-save-favorite').addEventListener('click', function() {
   if (!session || !lastLocation) return;
   var saveMsg = document.getElementById('save-msg');
@@ -3352,16 +3459,7 @@ document.getElementById('btn-save-favorite').addEventListener('click', function(
 
 
   if (!navigator.onLine) {
-    queuePendingOp('save_favorite', {
-      address: {
-        latitude: lastLocation.lat, longitude: lastLocation.lng,
-        location: 'SRID=4326;POINT(' + lastLocation.lng + ' ' + lastLocation.lat + ')',
-        plus_code: lastLocation.plus_code, postal_code: lastLocation.postal_code,
-        visibility_level: document.getElementById('favorite-visibility').value,
-        status: 'PROPOSED', source: 'app'
-      },
-      favorite: { category: document.getElementById('favorite-category').value }
-    });
+    guardarFavoritoNaFila();
     saveMsg.className = 'msg msg-success';
     saveMsg.textContent = 'Sem ligação — guardado no telemóvel, vai sincronizar automaticamente quando a internet voltar.';
     return;
@@ -3412,16 +3510,7 @@ document.getElementById('btn-save-favorite').addEventListener('click', function(
     saveMsg.className = 'msg msg-success'; saveMsg.textContent = 'Guardado! Já podes criar uma entrega para este local.';
     loadFavorites();
   }).catch(function() {
-    queuePendingOp('save_favorite', {
-      address: {
-        latitude: lastLocation.lat, longitude: lastLocation.lng,
-        location: 'SRID=4326;POINT(' + lastLocation.lng + ' ' + lastLocation.lat + ')',
-        plus_code: lastLocation.plus_code, postal_code: lastLocation.postal_code,
-        visibility_level: document.getElementById('favorite-visibility').value,
-        status: 'PROPOSED', source: 'app'
-      },
-      favorite: { category: document.getElementById('favorite-category').value }
-    });
+    guardarFavoritoNaFila();
     saveMsg.className = 'msg msg-success';
     saveMsg.textContent = 'Ligação instável — guardado no telemóvel, vai sincronizar automaticamente.';
   });
@@ -3436,21 +3525,19 @@ document.getElementById('search-input').addEventListener('input', function() {
   if (q.length < 3) { resultsBox.innerHTML = ''; return; }
   searchTimer = setTimeout(function() {
     resultsBox.innerHTML = '<p class="msg msg-muted">A pesquisar...</p>';
-    fetch(SUPABASE_URL + '/functions/v1/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + (session ? session.access_token : ANON_KEY) },
-      body: JSON.stringify({ query: q, user_id: session ? parseJwt(session.access_token).sub : null })
+    fetch(SUPABASE_URL + '/functions/v1/pesquisa', {
+      method: 'POST', headers: cabecalhosFuncao(), body: JSON.stringify({ query: q })
     }).then(function(r) { return r.json(); }).then(function(data) {
       resultsBox.innerHTML = '';
-      var results = data.results || [];
+      if (data.error) { resultsBox.innerHTML = '<p class="msg msg-error">' + esc(data.error === 'sessao invalida' ? 'Entra na tua conta para pesquisar.' : data.error) + '</p>'; return; }
+      var results = data.resultados || [];
       if (results.length === 0) { resultsBox.innerHTML = '<p class="msg msg-muted">Sem resultados.</p>'; return; }
       results.slice(0, 8).forEach(function(r) {
         var div = document.createElement('div');
         div.className = 'list-item';
-        var title = r.postal_code || r.name || r.reference || 'resultado';
-        var subtitle = r.kind || r.status || '';
-        div.innerHTML = '<div class="value-plain">' + title + '</div><div style="font-size:11.5px;color:var(--text-dim);">' + subtitle + '</div>';
-        if (r.latitude && r.longitude) {
+        var tipo = { morada: 'Morada', rua: 'Rua', bairro: 'Bairro' }[r.tipo] || '';
+        div.innerHTML = '<div class="value-plain">' + esc(r.titulo) + '</div><div style="font-size:11.5px;color:var(--text-dim);">' + esc([tipo, r.subtitulo].filter(Boolean).join(' · ')) + '</div>';
+        if (r.latitude != null && r.longitude != null) {
           div.style.cursor = 'pointer';
           div.addEventListener('click', function() {
             garantirMapa(Number(r.latitude), Number(r.longitude), 17);
@@ -3482,10 +3569,10 @@ function loadFavorites() {
       div.className = 'list-item';
       div.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">' +
         '<div>' +
-        '<div class="value-md" style="color:var(--accent);font-weight:600;">' + (addr.postal_code || addr.plus_code || 'sem código') + '</div>' +
-        '<div style="font-size:11.5px;color:var(--text-dim);margin-top:3px;">' + (place || (addr.latitude ? addr.latitude.toFixed(4) + ', ' + addr.longitude.toFixed(4) : '')) + ' · ' + fav.category + '</div>' +
+        '<div class="value-md" style="color:var(--accent);font-weight:600;">' + esc(addr.postal_code || addr.plus_code || 'sem código') + '</div>' +
+        '<div style="font-size:11.5px;color:var(--text-dim);margin-top:3px;">' + esc(place || (addr.latitude ? Number(addr.latitude).toFixed(4) + ', ' + Number(addr.longitude).toFixed(4) : '')) + ' · ' + esc(fav.category) + '</div>' +
         '</div>' +
-        '<button data-id="' + fav.id + '" class="fav-delete-btn icon-btn" aria-label="Apagar">🗑️</button>' +
+        '<button data-id="' + esc(fav.id) + '" class="fav-delete-btn icon-btn" aria-label="Apagar">🗑️</button>' +
         '</div>';
       list.appendChild(div);
     });
@@ -3793,8 +3880,9 @@ function entregaResolverCodigo(raw, tipo, msg) {
     }).then(function(r) { return r.json(); }).then(function(data) {
       if (!data.found) throw new Error('Link inválido ou morada privada.');
       msg.className = 'msg msg-success'; msg.textContent = 'Encontrado.';
-      if (tipo === 'destino') entregaSetDestino('CARD:' + cardMatch[1], data.address, 'shared_card');
-      else entregaSetOrigem(data.address, 'shared_card', 'CARD:' + cardMatch[1]);
+      var idCartao = data.address && data.address.id ? data.address.id : 'CARD:' + cardMatch[1];
+      if (tipo === 'destino') entregaSetDestino(idCartao, data.address, 'shared_card');
+      else entregaSetOrigem(data.address, 'shared_card', idCartao);
     }).catch(function(e) { msg.className = 'msg msg-error'; msg.textContent = e.message || 'Link inválido.'; });
     return;
   }
@@ -3941,10 +4029,52 @@ function entregaAtualizarPreco() {
   var box=document.getElementById('entrega-preco-preview'); box.style.display='block'; document.getElementById('entrega-preco-preview-linha').textContent='A calcular...';
   entregaGetOrigin(function(origin){
     var zoneCode=entregaDetermineZone(origin.municipality_id,origin.province_id);
-    fetch(SUPABASE_URL+'/functions/v1/pricing?action=quote',{method:'POST',headers:{'Content-Type':'application/json','apikey':ANON_KEY,'Authorization':'Bearer '+ANON_KEY},body:JSON.stringify({zone_code_hint:zoneCode,organization_id:null,origin_latitude:origin.latitude||origin.lat||null,origin_longitude:origin.longitude||origin.lng||null,destination_latitude:entregaDestinoAtual.latitude||null,destination_longitude:entregaDestinoAtual.longitude||null})})
+    var destinoId=entregaIdMorada(entregaDestinoAtual);
+    fetch(SUPABASE_URL+'/functions/v1/pricing?action=quote',{method:'POST',headers:cabecalhosFuncao(),body:JSON.stringify({address_id:destinoId,zone_code_hint:zoneCode,organization_id:null,origin_municipality_id:origin.municipality_id||null,origin_province_id:origin.province_id||null,destination_municipality_id:entregaDestinoAtual.municipality_id||null,destination_province_id:entregaDestinoAtual.province_id||null})})
       .then(function(r){return r.json();}).then(function(q){
-        var b=q.breakdown||{}; document.getElementById('entrega-preco-preview-linha').textContent='Grátis durante o piloto — fora do piloto: Frete '+(b.frete||0)+' + Roteamento '+(b.roteamento||0)+' + Prova '+(b.prova||0)+' = '+(q.amount_total||0)+' Kz (zona estimada '+zoneCode+')';
+        if(q.error){document.getElementById('entrega-preco-preview-linha').textContent='Grátis durante o piloto';return;}
+        var b=q.breakdown||{}, zona=q.zone_code||zoneCode, moeda=(!q.currency_code||q.currency_code==='AOA')?'Kz':q.currency_code;
+        document.getElementById('entrega-preco-preview-linha').textContent='Grátis durante o piloto — fora do piloto: Frete '+(b.frete||0)+' + Roteamento '+(b.roteamento||0)+' + Prova '+(b.prova||0)+(b.noturno_fim_de_semana?' + Noite/fim de semana '+b.noturno_fim_de_semana:'')+' = '+(q.amount_total||0)+' '+moeda+' (zona '+zona+(q.zone_estimated?', estimada':'')+')';
       }).catch(function(){document.getElementById('entrega-preco-preview-linha').textContent='Grátis durante o piloto';});
+  });
+}
+
+/** id da morada escolhida (null para Plus Code, GPS ou um cartão ainda não lido). */
+function entregaIdMorada(ponto) {
+  var id = ponto && ponto.address_id ? String(ponto.address_id) : '';
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ? id : null;
+}
+
+// O servidor só aceita entregas para uma morada (address_id). Para um Plus Code
+// ou GPS: primeiro procura uma morada com esse Plus Code; se não houver, cria
+// uma morada própria "por validar" e privada (só quem a cria a usa) e usa o id dela.
+function entregaGarantirMoradaDestino(ponto) {
+  var id = entregaIdMorada(ponto);
+  if (id) return Promise.resolve(id);
+  if (ponto.latitude == null || ponto.longitude == null) return Promise.reject(new Error('Este destino não tem localização. Escolhe outro.'));
+  var procurar = ponto.plus_code
+    ? fetch(SUPABASE_URL + '/functions/v1/pesquisa', { method: 'POST', headers: cabecalhosFuncao(), body: JSON.stringify({ query: ponto.plus_code }) })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          var m = (d.resultados || []).find(function(x) { return x.tipo === 'morada' && x.plus_code && x.plus_code.toUpperCase() === String(ponto.plus_code).toUpperCase(); });
+          return m ? m.id : null;
+        }).catch(function() { return null; })
+    : Promise.resolve(null);
+  return procurar.then(function(encontrado) {
+    if (encontrado) return encontrado;
+    var lat = Number(ponto.latitude), lng = Number(ponto.longitude);
+    return fetch(SUPABASE_URL + '/rest/v1/addresses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token, 'Prefer': 'return=representation' },
+      body: JSON.stringify({
+        latitude: lat, longitude: lng, location: 'SRID=4326;POINT(' + lng + ' ' + lat + ')',
+        plus_code: ponto.plus_code || encodeOLC(lat, lng), accuracy_meters: ponto.accuracy != null ? Number(ponto.accuracy) : null,
+        visibility_level: 'PRIVATE', status: 'PROPOSED', source: 'app'
+      })
+    }).then(function(r) { return r.json().then(function(rows) {
+      if (!r.ok || !rows || !rows[0]) throw new Error('Não foi possível guardar este ponto como morada.');
+      return rows[0].id;
+    }); });
   });
 }
 
@@ -3988,27 +4118,45 @@ function entregaPontoPayload(prefix,ponto) {
   return out;
 }
 
-function gerarEntregaOfflineIdentidade() {
-  var tracking = 'AL-' + (window.crypto && crypto.randomUUID ? crypto.randomUUID().replace(/-/g,'').toUpperCase() : (Date.now().toString(36)+Math.random().toString(36).slice(2,14)).toUpperCase());
-  var array = new Uint32Array(1);
-  if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(array);
-  var pin = String((array[0] || Math.floor(Math.random()*10000)) % 10000).padStart(4,'0');
-  return { tracking_code: tracking, confirmation_pin: pin };
-}
-
 function mostrarEntregaCriadaLocal(payload, nome, offline) {
   document.getElementById('entrega-form').style.display='none'; document.getElementById('entrega-criada').style.display='block';
-  document.getElementById('tracking-code').textContent=payload.tracking_code || '-';
   document.getElementById('entrega-postal-code').textContent=entregaLabelPonto(entregaDestinoAtual)||'sem código';
-  document.getElementById('entrega-estado').textContent=offline ? 'Estado: Guardada offline — será sincronizada automaticamente' : 'Estado: Criada';
-  document.getElementById('delivery-pin').textContent=payload.confirmation_pin || '----';
   var qrContainer=document.getElementById('entrega-qr'); qrContainer.innerHTML='';
-  var trackLink=window.location.origin+window.location.pathname+'?rastreio='+payload.tracking_code;
+  var shareMsg=document.getElementById('entrega-share-msg'); shareMsg.textContent='';
+  var btnPin=document.getElementById('btn-ver-pin-entrega');
+  if (offline || !payload.tracking_code) {
+    // O código de rastreio e o PIN só existem depois de o servidor criar a entrega.
+    document.getElementById('tracking-code').textContent='por atribuir';
+    document.getElementById('delivery-pin').textContent='----';
+    document.getElementById('entrega-estado').textContent='Estado: Guardada no telemóvel — o código de rastreio e o PIN são criados pelo servidor quando a internet voltar e a entrega sincronizar.';
+    document.getElementById('btn-partilhar-entrega').onclick=null;
+    document.getElementById('btn-copiar-entrega').onclick=null;
+    if (btnPin) btnPin.style.display='none';
+    return;
+  }
+  document.getElementById('tracking-code').textContent=payload.tracking_code;
+  document.getElementById('entrega-estado').textContent='Estado: Criada';
+  document.getElementById('delivery-pin').textContent=payload.confirmation_pin || '----';
+  if (btnPin) {
+    btnPin.style.display=payload.id?'inline-block':'none';
+    btnPin.onclick=function(){
+      shareMsg.textContent='A ler o PIN...';
+      fetch(SUPABASE_URL+'/functions/v1/deliveries?action=get_pin',{method:'POST',headers:cabecalhosFuncao(),body:JSON.stringify({delivery_id:payload.id})})
+        .then(function(r){return r.json();}).then(function(d){
+          if(d.error){shareMsg.textContent=String(d.error);return;}
+          payload.confirmation_pin=d.pin; document.getElementById('delivery-pin').textContent=d.pin||'----';
+          shareMsg.textContent=d.bloqueado?'PIN bloqueado (5 tentativas erradas).':'';
+        }).catch(function(){shareMsg.textContent='Erro de ligação.';});
+    };
+  }
+  var trackLink=window.location.origin+window.location.pathname+'?rastreio='+encodeURIComponent(payload.tracking_code);
   new QRCode(qrContainer,{text:trackLink,width:140,height:140,colorDark:'#181818',colorLight:'#ffffff'});
   wireQrActions('entrega-qr','btn-guardar-qr-entrega','btn-partilhar-qr-entrega','qr-rastreio-'+payload.tracking_code+'.png');
-  var shareText='Entrega para '+nome+' · Código de rastreio: '+payload.tracking_code+' · PIN: '+payload.confirmation_pin+' · Acompanha aqui: '+trackLink;
-  document.getElementById('btn-partilhar-entrega').onclick=function(){if(navigator.share)navigator.share({title:'Angola Localiza — Entrega',text:shareText}).catch(function(){});else if(navigator.clipboard){navigator.clipboard.writeText(shareText);document.getElementById('entrega-share-msg').textContent='Copiado!';}};
-  document.getElementById('btn-copiar-entrega').onclick=function(){if(navigator.clipboard){navigator.clipboard.writeText(payload.tracking_code);document.getElementById('entrega-share-msg').textContent='Código copiado!';}};
+  document.getElementById('btn-partilhar-entrega').onclick=function(){
+    var shareText='Entrega para '+nome+' · Código de rastreio: '+payload.tracking_code+' · PIN: '+(payload.confirmation_pin||'----')+' · Acompanha aqui: '+trackLink;
+    if(navigator.share)navigator.share({title:'Angola Localiza — Entrega',text:shareText}).catch(function(){});else if(navigator.clipboard){navigator.clipboard.writeText(shareText);shareMsg.textContent='Copiado!';}
+  };
+  document.getElementById('btn-copiar-entrega').onclick=function(){if(navigator.clipboard){navigator.clipboard.writeText(payload.tracking_code);shareMsg.textContent='Código copiado!';}};
 }
 
 document.getElementById('btn-criar-entrega').addEventListener('click',function(){
@@ -4036,8 +4184,13 @@ document.getElementById('btn-criar-entrega').addEventListener('click',function()
     // GPS é resolvido no instante da criação; os restantes modos permanecem independentes de um endereço guardado.
     if(entregaOrigemAtual.source_type==='gps') entregaOrigemAtual=entregaNormalizarPonto(origin,'gps');
     var zoneCode=entregaDetermineZone(entregaOrigemAtual.municipality_id,entregaOrigemAtual.province_id);
+    var destinoId=entregaIdMorada(entregaDestinoAtual);
+    if (!destinoId && !navigator.onLine) {
+      msg.className='msg msg-error'; msg.textContent='Sem internet só podes enviar para um local guardado. Liga-te à internet para usar um Plus Code, GPS ou link.';
+      releaseDeliverySubmitLock(); return;
+    }
     var payload=Object.assign({
-      address_id:entregaDestinoAtual.address_id&&String(entregaDestinoAtual.address_id).indexOf('CARD:')!==0?entregaDestinoAtual.address_id:null,
+      address_id:destinoId,
       recipient_name:nome,recipient_phone:contacto||null,instructions:nota||null,
       cargo_type:document.getElementById('entrega-carga-tipo').value,
       cargo_description:document.getElementById('entrega-carga-descricao').value.trim()||null,
@@ -4060,21 +4213,21 @@ document.getElementById('btn-criar-entrega').addEventListener('click',function()
     payload.origin_municipality_id=entregaOrigemAtual.municipality_id||null; payload.origin_province_id=entregaOrigemAtual.province_id||null;
     payload.origin_postal_code=entregaOrigemAtual.postal_code||null; payload.origin_plus_code=entregaOrigemAtual.plus_code||null;
     if (!navigator.onLine) {
-      var offlineIdentity = gerarEntregaOfflineIdentidade();
-      payload.tracking_code = offlineIdentity.tracking_code;
-      payload.confirmation_pin = offlineIdentity.confirmation_pin;
-      payload.offline_generated = true;
       queuePendingOp('create_delivery', payload);
       mostrarEntregaCriadaLocal(payload, nome, true);
-      msg.className='msg msg-success'; msg.textContent='📴 Sem internet — entrega guardada com rastreio e PIN gerados no dispositivo. Será sincronizada quando a internet voltar.';
+      msg.className='msg msg-success'; msg.textContent='📴 Sem internet — entrega guardada no telemóvel. O código de rastreio e o PIN são criados pelo servidor quando a internet voltar.';
       return;
     }
     msg.textContent='A criar...';
-    fetch(SUPABASE_URL+'/functions/v1/deliveries?action=create',{method:'POST',headers:{'Content-Type':'application/json','apikey':ANON_KEY,'Authorization':'Bearer '+session.access_token},body:JSON.stringify(payload)})
+    var erroMorada=null;
+    entregaGarantirMoradaDestino(entregaDestinoAtual).catch(function(e){erroMorada=e;throw e;}).then(function(idMorada){
+      payload.address_id=idMorada; entregaDestinoAtual.address_id=idMorada;
+      return fetch(SUPABASE_URL+'/functions/v1/deliveries?action=create',{method:'POST',headers:{'Content-Type':'application/json','apikey':ANON_KEY,'Authorization':'Bearer '+session.access_token},body:JSON.stringify(payload)});
+    })
       .then(function(r){return r.json();}).then(function(delivery){
         if(delivery.error){
           msg.className='msg msg-error';
-          msg.textContent=delivery.error+' Se a API ainda exigir address_id, é necessário atualizar a Edge Function deliveries para aceitar pickup_point/destination_point.';
+          msg.textContent=delivery.error==='ZONE_NOT_FOUND'?'Zona de preço inválida.':String(delivery.error);
           releaseDeliverySubmitLock();
           return;
         }
@@ -4087,6 +4240,8 @@ document.getElementById('btn-criar-entrega').addEventListener('click',function()
         saveDeixaAqui.then(function(){mostrarEntregaCriadaLocal(createdPayload, nome, false);});
 
       }).catch(function(){
+        if (erroMorada) { msg.className='msg msg-error'; msg.textContent=erroMorada.message||'Não foi possível preparar o destino.'; releaseDeliverySubmitLock(); return; }
+        if (!payload.address_id) { msg.className='msg msg-error'; msg.textContent='Erro de ligação. Tenta novamente.'; releaseDeliverySubmitLock(); return; }
         try { queuePendingOp('create_delivery',payload); }
         catch (e) { msg.className='msg msg-error'; msg.textContent='Não foi possível guardar a entrega. Tenta novamente.'; releaseDeliverySubmitLock(); return; }
         msg.className='msg msg-success';
@@ -4159,16 +4314,16 @@ function apiKeysLoad() {
     headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
   }).then(function(r) { return r.json(); }).then(function(data) {
     list.innerHTML = '';
-    if (data.error) { list.innerHTML = '<p class="msg msg-error">' + data.error + '</p>'; return; }
+    if (data.error) { list.innerHTML = '<p class="msg msg-error">' + esc(data.error) + '</p>'; return; }
     if (!data.keys || data.keys.length === 0) { empty.style.display = 'block'; return; }
     data.keys.forEach(function(k) {
       var div = document.createElement('div');
       div.className = 'list-item';
       div.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
-        '<div><div style="font-weight:600;font-size:13px;">' + k.name + (k.revoked ? ' <span style="color:var(--danger);font-size:11px;">(revogada)</span>' : '') + '</div>' +
-        '<div style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);">' + k.key_prefix + '</div>' +
-        '<div style="font-size:10.5px;color:var(--text-faint);">' + k.rate_limit_per_minute + ' pedidos/min · criada ' + new Date(k.created_at).toLocaleDateString('pt-PT') + '</div></div>' +
-        (!k.revoked ? '<button data-id="' + k.id + '" class="api-key-revogar-btn btn btn-danger-outline btn-sm">Revogar</button>' : '') + '</div>';
+        '<div><div style="font-weight:600;font-size:13px;">' + esc(k.name) + (k.revoked ? ' <span style="color:var(--danger);font-size:11px;">(revogada)</span>' : '') + '</div>' +
+        '<div style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);">' + esc(k.key_prefix) + '</div>' +
+        '<div style="font-size:10.5px;color:var(--text-faint);">' + esc(k.rate_limit_per_minute) + ' pedidos/min · criada ' + new Date(k.created_at).toLocaleDateString('pt-PT') + '</div></div>' +
+        (!k.revoked ? '<button data-id="' + esc(k.id) + '" class="api-key-revogar-btn btn btn-danger-outline btn-sm">Revogar</button>' : '') + '</div>';
       list.appendChild(div);
     });
     document.querySelectorAll('.api-key-revogar-btn').forEach(function(b) {
@@ -4261,7 +4416,7 @@ function loadAdmin() {
     } else { pessoasBadge.style.display = 'none'; kycInlineBadge.style.display = 'none'; }
   });
 
-document.getElementById('btn-historico-consultar').addEventListener('click', function() {
+document.getElementById('btn-historico-consultar').onclick = function() {
   var codigo = document.getElementById('historico-codigo-input').value.trim();
   var box = document.getElementById('historico-resultado');
   if (!codigo) { box.innerHTML = '<p class="msg msg-error">Escreve um código postal.</p>'; return; }
@@ -4270,49 +4425,49 @@ document.getElementById('btn-historico-consultar').addEventListener('click', fun
     method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
     body: JSON.stringify({ postal_code: codigo })
   }).then(function(r) { return r.json(); }).then(function(data) {
-    if (data.error) { box.innerHTML = '<p class="msg msg-error">' + data.error + '</p>'; return; }
+    if (data.error) { box.innerHTML = '<p class="msg msg-error">' + esc(data.error) + '</p>'; return; }
     var a = data.address;
     var confCor = a.confidence_score == null ? 'var(--text-dim)' : (a.confidence_score >= 80 ? 'var(--success)' : a.confidence_score >= 50 ? '#D6A32E' : 'var(--danger)');
     var html = '<div class="card">' +
-      '<div class="label-caps">Confiança</div><div class="value-md" style="color:' + confCor + ';">' + (a.confidence_score != null ? Math.round(a.confidence_score) + '/100 — ' + a.confidence_band : a.confidence_band) + '</div>' +
+      '<div class="label-caps">Confiança</div><div class="value-md" style="color:' + confCor + ';">' + esc(a.confidence_score != null ? Math.round(a.confidence_score) + '/100 — ' + a.confidence_band : a.confidence_band) + '</div>' +
       '<div class="label-caps" style="margin-top:8px;">Precisão do GPS na captação</div><div class="value-plain">' + (a.accuracy_meters != null ? '±' + Math.round(a.accuracy_meters) + ' m' : 'não registada') + '</div>' +
-      '<div class="label-caps" style="margin-top:8px;">Estado</div><div class="value-plain">' + a.status + '</div>' +
-      '<div class="label-caps" style="margin-top:8px;">Registada por</div><div class="value-plain">' + (a.created_by_email || '—') + ' em ' + new Date(a.created_at).toLocaleString('pt-PT') + '</div>' +
-      (a.validated_by_email ? '<div class="label-caps" style="margin-top:8px;">Validada por</div><div class="value-plain">' + a.validated_by_email + (a.validated_at ? ' em ' + new Date(a.validated_at).toLocaleString('pt-PT') : '') + '</div>' : '') +
+      '<div class="label-caps" style="margin-top:8px;">Estado</div><div class="value-plain">' + esc(a.status) + '</div>' +
+      '<div class="label-caps" style="margin-top:8px;">Registada por</div><div class="value-plain">' + esc(a.created_by_email || '—') + ' em ' + new Date(a.created_at).toLocaleString('pt-PT') + '</div>' +
+      (a.validated_by_email ? '<div class="label-caps" style="margin-top:8px;">Validada por</div><div class="value-plain">' + esc(a.validated_by_email) + (a.validated_at ? ' em ' + new Date(a.validated_at).toLocaleString('pt-PT') : '') + '</div>' : '') +
       '</div>';
     html += '<div class="label-caps" style="margin-top:14px;margin-bottom:6px;">Histórico de alterações</div>';
     if (!data.historico || data.historico.length === 0) {
       html += '<p class="msg msg-muted">Sem registos de auditoria.</p>';
     } else {
       data.historico.forEach(function(h) {
-        html += '<div class="list-item"><div class="value-plain" style="font-size:12.5px;">' + h.action + '</div>' +
-          '<div style="font-size:10.5px;color:var(--text-dim);margin-top:2px;">' + (h.actor_email || 'sistema') + ' · ' + new Date(h.created_at).toLocaleString('pt-PT') + '</div></div>';
+        html += '<div class="list-item"><div class="value-plain" style="font-size:12.5px;">' + esc(h.action) + '</div>' +
+          '<div style="font-size:10.5px;color:var(--text-dim);margin-top:2px;">' + esc(h.actor_email || 'sistema') + ' · ' + new Date(h.created_at).toLocaleString('pt-PT') + '</div></div>';
       });
     }
     box.innerHTML = html;
   }).catch(function() { box.innerHTML = '<p class="msg msg-error">Erro de ligação.</p>'; });
-});
+};
 
-  document.getElementById('btn-territorial-stats').addEventListener('click', function() {
+  document.getElementById('btn-territorial-stats').onclick = function() {
     var box = document.getElementById('territorial-stats-box');
     box.style.display = 'block';
     box.innerHTML = '<p class="msg msg-muted">A consultar histórico territorial...</p>';
     fetch(SUPABASE_URL + '/functions/v1/admin?action=territorial_stats', {
       method:'POST', headers:{'Content-Type':'application/json','apikey':ANON_KEY,'Authorization':'Bearer '+session.access_token}, body:'{}'
     }).then(function(r){ return r.json(); }).then(function(data) {
-      if (data.error) { box.innerHTML='<p class="msg msg-error">'+data.error+'</p>'; return; }
+      if (data.error) { box.innerHTML='<p class="msg msg-error">'+esc(data.error)+'</p>'; return; }
       var rows=data.territorial_stats||[];
       if (!rows.length) { box.innerHTML='<p class="msg msg-muted">Ainda não há histórico territorial suficiente.</p>'; return; }
       box.innerHTML=rows.slice(0,12).map(function(x){
         var pct=(x.failure_rate*100).toFixed(1);
-        var reasons=Object.entries(x.failure_reasons||{}).map(function(e){return e[0]+': '+e[1];}).join(' · ') || 'Sem falhas registadas';
-        return '<div class="list-item"><div style="font-weight:700;">Quadra '+x.quadra_id+'</div>'+
+        var reasons=Object.entries(x.failure_reasons||{}).map(function(e){return esc(e[0])+': '+esc(e[1]);}).join(' · ') || 'Sem falhas registadas';
+        return '<div class="list-item"><div style="font-weight:700;">Quadra '+esc(x.quadra_id)+'</div>'+
           '<div style="font-size:11px;color:var(--text-dim);margin-top:3px;">'+x.total_events+' eventos · '+x.delivered+' concluídas · '+x.failed+' falhadas · taxa de falha '+pct+'%</div>'+
           '<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">Motivos: '+reasons+'</div></div>';
       }).join('')+
       '<p style="font-size:10.5px;color:var(--text-dim);margin-top:8px;">Amostra consultada: '+(data.sample_size||0)+' eventos. Estes dados servem para análise e não bloqueiam nem classificam automaticamente uma entrega.</p>';
     }).catch(function(){ box.innerHTML='<p class="msg msg-error">Erro ao consultar histórico territorial.</p>'; });
-  });
+  };
 
   fetch(SUPABASE_URL + '/functions/v1/admin?action=dados_resumo', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }, body: '{}'
@@ -4330,9 +4485,9 @@ document.getElementById('btn-historico-consultar').addEventListener('click', fun
     if (data.error) { list.innerHTML = ''; return; }
     list.innerHTML = (data.staff || []).map(function(s) {
       return '<div class="list-item">' +
-        '<div class="value-plain" style="font-weight:600;">' + (s.email || '?') + '</div>' +
-        '<div style="font-size:11px;color:var(--text-dim);margin-top:2px;">' + (ROLE_LABELS[s.role] || s.role) + ' · ' + (s.sector || '') + (s.scope_province_name ? ' · ' + s.scope_province_name : '') + '</div>' +
-        '<div style="font-size:11px;margin-top:2px;color:' + (s.identity_status === 'ID_VERIFIED' ? 'var(--success)' : 'var(--danger)') + ';">' + s.identity_status + ' · entrou via ' + s.onboarded_via + '</div>' +
+        '<div class="value-plain" style="font-weight:600;">' + esc(s.email || '?') + '</div>' +
+        '<div style="font-size:11px;color:var(--text-dim);margin-top:2px;">' + esc((ROLE_LABELS[s.role] || s.role) + ' · ' + (s.sector || '') + (s.scope_province_name ? ' · ' + s.scope_province_name : '')) + '</div>' +
+        '<div style="font-size:11px;margin-top:2px;color:' + (s.identity_status === 'ID_VERIFIED' ? 'var(--success)' : 'var(--danger)') + ';">' + esc(s.identity_status) + ' · entrou via ' + esc(s.onboarded_via) + '</div>' +
         '</div>';
     }).join('') || '<p class="msg msg-muted">Sem utilizadores.</p>';
   }).catch(function() {});
@@ -4349,11 +4504,11 @@ document.getElementById('btn-historico-consultar').addEventListener('click', fun
       var div = document.createElement('div');
       div.className = 'list-item';
       div.innerHTML =
-        '<div class="value-md" style="color:var(--accent);font-weight:600;">' + (addr.postal_code || addr.plus_code || 'sem código') + '</div>' +
-        '<div style="font-size:11.5px;color:var(--text-dim);margin:3px 0 10px;">' + addr.latitude.toFixed(4) + ', ' + addr.longitude.toFixed(4) + ' · fonte: ' + (addr.source || 'app') + '</div>' +
+        '<div class="value-md" style="color:var(--accent);font-weight:600;">' + esc(addr.postal_code || addr.plus_code || 'sem código') + '</div>' +
+        '<div style="font-size:11.5px;color:var(--text-dim);margin:3px 0 10px;">' + Number(addr.latitude).toFixed(4) + ', ' + Number(addr.longitude).toFixed(4) + ' · fonte: ' + esc(addr.source || 'app') + '</div>' +
         '<div class="btn-row">' +
-          '<button data-id="' + addr.id + '" data-action="approve_address" class="admin-btn btn btn-success-solid btn-sm">Aprovar</button>' +
-          '<button data-id="' + addr.id + '" data-action="reject_address" class="admin-btn btn btn-danger-outline btn-sm">Rejeitar</button>' +
+          '<button data-id="' + esc(addr.id) + '" data-action="approve_address" class="admin-btn btn btn-success-solid btn-sm">Aprovar</button>' +
+          '<button data-id="' + esc(addr.id) + '" data-action="reject_address" class="admin-btn btn btn-danger-outline btn-sm">Rejeitar</button>' +
         '</div>';
       list.appendChild(div);
     });
@@ -4374,6 +4529,65 @@ document.getElementById('btn-historico-consultar').addEventListener('click', fun
   loadPricingAdmin();
   loadJoinLinks();
   if (myRoles.indexOf('super_admin') > -1 || myRoles.indexOf('admin_nacional') > -1 || myRoles.indexOf('auditor') > -1) loadKycReview();
+  loadCandidaturasMotorista();
+}
+
+var DOCS_MOTORISTA = { id_document_path: 'BI', license_front_path: 'Carta (frente)', license_back_path: 'Carta (verso)', vehicle_document_path: 'Livrete', selfie_path: 'Selfie' };
+// Só se aprova depois de abrir os documentos (links de 10 minutos; cada abertura fica registada).
+function loadCandidaturasMotorista() {
+  var list = document.getElementById('motoristas-list'), msg = document.getElementById('motoristas-msg');
+  if (!list) return;
+  list.innerHTML = '<p class="msg msg-muted">A carregar...</p>';
+  fetch(SUPABASE_URL + '/functions/v1/driver-kyc?action=list_pending', { method: 'POST', headers: cabecalhosFuncao(), body: '{}' })
+    .then(function(r) { return r.json(); }).then(function(data) {
+      if (data.error) { list.innerHTML = ''; msg.className = 'msg msg-muted'; msg.textContent = data.error === 'APENAS_ADMINISTRADORES' ? '' : String(data.error); return; }
+      var apps = data.applications || [];
+      if (!apps.length) { list.innerHTML = '<p class="msg msg-muted">Não há candidaturas por rever.</p>'; return; }
+      list.innerHTML = apps.map(function(a) {
+        return '<div class="list-item" data-candidato="' + esc(a.user_id) + '">' +
+          '<div class="value-plain" style="font-weight:600;">' + esc(a.full_name || a.email || a.user_id) + '</div>' +
+          '<div style="font-size:11px;color:var(--text-dim);margin:2px 0 6px;">' + esc([a.vehicle_type, a.vehicle_plate].filter(Boolean).join(' · ')) +
+            (a.vehicle_capacity_kg != null ? ' · ' + esc(a.vehicle_capacity_kg) + ' kg' : '') + ' · carta ' + esc(a.license_number || '—') + ' · ' + esc(a.country_code) + '</div>' +
+          '<button class="btn btn-secondary btn-sm mot-docs">Ver documentos</button>' +
+          '<div class="mot-links btn-row" style="flex-wrap:wrap;gap:6px;margin-top:6px;"></div>' +
+          '<input class="input mot-motivo" placeholder="Motivo da recusa (obrigatório para recusar)" style="margin-top:6px;" />' +
+          '<div class="btn-row" style="margin-top:6px;"><button class="btn btn-success-solid btn-sm mot-aprovar" disabled>Aprovar</button><button class="btn btn-danger-outline btn-sm mot-recusar">Recusar</button></div>' +
+          '</div>';
+      }).join('');
+      list.querySelectorAll('[data-candidato]').forEach(function(card) {
+        var uid = card.dataset.candidato;
+        card.querySelector('.mot-docs').addEventListener('click', function() {
+          msg.textContent = '';
+          fetch(SUPABASE_URL + '/functions/v1/driver-kyc?action=view', { method: 'POST', headers: cabecalhosFuncao(), body: JSON.stringify({ user_id: uid }) })
+            .then(function(r) { return r.json(); }).then(function(d) {
+              if (d.error) { msg.className = 'msg msg-error'; msg.textContent = String(d.error); return; }
+              var box = card.querySelector('.mot-links'); box.innerHTML = '';
+              Object.keys(DOCS_MOTORISTA).forEach(function(k) {
+                var url = d.links && d.links[k];
+                if (!url) return;
+                var a = document.createElement('a');
+                a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.className = 'btn btn-secondary btn-sm';
+                a.textContent = 'Abrir: ' + DOCS_MOTORISTA[k];
+                box.appendChild(a);
+              });
+              card.querySelector('.mot-aprovar').disabled = false;
+            }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
+        });
+        function rever(decisao) {
+          var motivo = card.querySelector('.mot-motivo').value.trim();
+          if (decisao === 'reject' && motivo.length < 5) { msg.className = 'msg msg-error'; msg.textContent = 'Escreve o motivo da recusa (pelo menos 5 letras).'; return; }
+          fetch(SUPABASE_URL + '/functions/v1/driver-kyc?action=review', { method: 'POST', headers: cabecalhosFuncao(),
+            body: JSON.stringify({ user_id: uid, decision: decisao, reason: decisao === 'reject' ? motivo : null }) })
+            .then(function(r) { return r.json(); }).then(function(d) {
+              if (d.error) { msg.className = 'msg msg-error'; msg.textContent = String(d.error); return; }
+              msg.className = 'msg msg-success'; msg.textContent = decisao === 'approve' ? 'Candidatura aprovada.' : 'Candidatura recusada.';
+              loadCandidaturasMotorista();
+            }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
+        }
+        card.querySelector('.mot-aprovar').addEventListener('click', function() { rever('approve'); });
+        card.querySelector('.mot-recusar').addEventListener('click', function() { rever('reject'); });
+      });
+    }).catch(function() { list.innerHTML = '<p class="msg msg-error">Erro de ligação.</p>'; });
 }
 
 function loadKycReview() {
@@ -4393,19 +4607,19 @@ function loadKycReview() {
     ];
     list.innerHTML = items.map(function(v) {
       return '<div class="list-item">' +
-        '<div class="value-plain" style="font-weight:600;">' + (v.email || v.user_id) + '</div>' +
-        '<div style="font-size:11px;color:var(--text-dim);margin:2px 0 6px;">' + v.method + ' · BI ****' + (v.id_last4 || '') + ' · Protocolo #' + v.protocol + '</div>' +
+        '<div class="value-plain" style="font-weight:600;">' + esc(v.email || v.user_id) + '</div>' +
+        '<div style="font-size:11px;color:var(--text-dim);margin:2px 0 6px;">' + esc(v.method) + ' · BI ****' + esc(v.id_last4 || '') + ' · Protocolo #' + esc(v.protocol) + '</div>' +
         '<div class="btn-row" style="flex-wrap:wrap;gap:6px;margin-bottom:8px;">' +
-          '<button class="btn btn-secondary btn-sm kyc-ver" data-id="' + v.id + '" data-artifact="id_photo">Ver frente</button>' +
-          '<button class="btn btn-secondary btn-sm kyc-ver" data-id="' + v.id + '" data-artifact="back">Ver verso</button>' +
-          '<button class="btn btn-secondary btn-sm kyc-ver" data-id="' + v.id + '" data-artifact="video">Ver vídeo</button>' +
+          '<button class="btn btn-secondary btn-sm kyc-ver" data-id="' + esc(v.id) + '" data-artifact="id_photo">Ver frente</button>' +
+          '<button class="btn btn-secondary btn-sm kyc-ver" data-id="' + esc(v.id) + '" data-artifact="back">Ver verso</button>' +
+          '<button class="btn btn-secondary btn-sm kyc-ver" data-id="' + esc(v.id) + '" data-artifact="video">Ver vídeo</button>' +
         '</div>' +
         checklistItens.map(function(c) {
-          return '<label style="display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:4px;"><input type="checkbox" class="kyc-checklist-item" data-verif="' + v.id + '" data-item="' + c[0] + '" /> ' + c[1] + '</label>';
+          return '<label style="display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:4px;"><input type="checkbox" class="kyc-checklist-item" data-verif="' + esc(v.id) + '" data-item="' + c[0] + '" /> ' + c[1] + '</label>';
         }).join('') +
         '<div class="btn-row" style="margin-top:6px;">' +
-          '<button class="btn btn-success-solid btn-sm kyc-decidir" data-id="' + v.id + '" data-decision="approve" disabled>Aprovar</button>' +
-          '<button class="btn btn-danger-outline btn-sm kyc-decidir" data-id="' + v.id + '" data-decision="reject">Rejeitar</button>' +
+          '<button class="btn btn-success-solid btn-sm kyc-decidir" data-id="' + esc(v.id) + '" data-decision="approve" disabled>Aprovar</button>' +
+          '<button class="btn btn-danger-outline btn-sm kyc-decidir" data-id="' + esc(v.id) + '" data-decision="reject">Rejeitar</button>' +
         '</div></div>';
     }).join('');
     document.querySelectorAll('.kyc-checklist-item').forEach(function(cb) {
@@ -4461,28 +4675,20 @@ document.getElementById('btn-pesquisar-morada').addEventListener('click', functi
   if (!texto) { box.innerHTML = '<p class="msg msg-error">Escreve um código ou "Rua, número".</p>'; return; }
   box.innerHTML = '<p class="msg msg-muted">A procurar...</p>';
 
-  var payload = {};
-  var match = texto.match(/^(.*?)\s*,?\s*(?:n[º°]?\s*|casa\s+)?(\d+[a-zA-Z]?)$/i);
-  if (match && match[1].trim()) {
-    payload.street_name = match[1].trim();
-    payload.house_number = match[2].trim();
-  } else {
-    payload.query = texto;
-  }
-
-  fetch(SUPABASE_URL + '/functions/v1/resolve-address', {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY }, body: JSON.stringify(payload)
+  fetch(SUPABASE_URL + '/functions/v1/pesquisa', {
+    method: 'POST', headers: cabecalhosFuncao(), body: JSON.stringify({ query: texto })
   }).then(function(r) { return r.json(); }).then(function(data) {
-    if (!data.found) { box.innerHTML = '<p class="msg msg-error">Não encontrei nenhuma morada. Tenta o código postal completo, ou "Rua X, 12".</p>'; return; }
-    var a = data.address;
-    var linha = a.streets ? a.streets.name + (a.house_number ? ' · nº ' + a.house_number : '') : '';
-    box.innerHTML = '<div class="card">' +
-      '<div class="label-caps">Encontrado</div>' +
-      '<div class="value-md" style="color:var(--accent);">' + a.postal_code + '</div>' +
-      (a.plus_code ? '<div style="font-size:11px;color:var(--text-faint);">' + a.plus_code + '</div>' : '') +
-      (linha ? '<div style="font-size:12.5px;margin-top:6px;">' + linha + '</div>' : '') +
-      (a.reference ? '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">📍 ' + a.reference + '</div>' : '') +
-      '</div>';
+    if (data.error) { box.innerHTML = '<p class="msg msg-error">' + esc(data.error) + '</p>'; return; }
+    var moradas = (data.resultados || []).filter(function(r) { return r.tipo === 'morada'; });
+    if (!moradas.length) { box.innerHTML = '<p class="msg msg-error">Não encontrei nenhuma morada. Tenta o código postal completo, ou "Rua X, 12".</p>'; return; }
+    box.innerHTML = moradas.slice(0, 5).map(function(a) {
+      return '<div class="card">' +
+        '<div class="label-caps">Encontrado</div>' +
+        '<div class="value-md" style="color:var(--accent);">' + esc(a.titulo) + '</div>' +
+        (a.plus_code && a.plus_code !== a.titulo ? '<div style="font-size:11px;color:var(--text-faint);">' + esc(a.plus_code) + '</div>' : '') +
+        (a.subtitulo ? '<div style="font-size:12.5px;margin-top:6px;">' + esc(a.subtitulo) + '</div>' : '') +
+        '</div>';
+    }).join('');
   }).catch(function() { box.innerHTML = '<p class="msg msg-error">Erro de ligação.</p>'; });
 });
 
@@ -4495,7 +4701,12 @@ document.getElementById('btn-abrir-registar-local').addEventListener('click', fu
   fetch(SUPABASE_URL + '/functions/v1/citizen-verify?action=status', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }, body: '{}'
   }).then(function(r) { return r.json(); }).then(function(data) {
-    if (!data.citizen_id_verified) { alert('Precisas de fazer a verificação simples primeiro — vai a Definições → Verificação simples.'); return; }
+    if (!data.citizen_id_verified) {
+      alert(data.citizen_id_status === 'PENDING_REVIEW'
+        ? 'A tua verificação simples ainda está em revisão. Recebes uma notificação quando for aprovada.'
+        : 'Precisas de fazer a verificação simples primeiro — vai a Definições → Verificação simples.');
+      return;
+    }
     document.getElementById('registar-local-form').style.display = 'block';
     document.getElementById('registar-local-form').scrollIntoView({ behavior: 'smooth' });
     registarLocalFotoUrl = null; registarLocalDuplicadoConfirmado = false; document.getElementById('registar-local-duplicado-justificacao').value = ''; document.getElementById('registar-local-bairro-novo').value = '';
@@ -4507,10 +4718,10 @@ document.getElementById('btn-abrir-registar-local').addEventListener('click', fu
       body: JSON.stringify({ latitude: lastLocation.lat, longitude: lastLocation.lng })
     }).then(function(r) { return r.json(); }).then(function(qData) {
       registarLocalRuas = qData.streets || [];
-      var opts = registarLocalRuas.map(function(s) { return '<option value="' + s.id + '">' + s.name + '</option>'; }).join('');
+      var opts = registarLocalRuas.map(function(s) { return '<option value="' + esc(s.id) + '">' + esc(s.name) + '</option>'; }).join('');
       document.getElementById('registar-local-rua').innerHTML = opts + '<option value="__nova__">➕ Esta rua não está na lista</option><option value="__no_name__">📍 Rua sem nome / não oficial</option>';
       var bairroSel = document.getElementById('registar-local-bairro');
-      var bairros = (qData.neighborhoods_nearby || []).map(function(nome) { return '<option value="' + String(nome).replace(/"/g, '&quot;') + '">' + nome + '</option>'; }).join('');
+      var bairros = (qData.neighborhoods_nearby || []).map(function(nome) { return '<option value="' + esc(nome) + '">' + esc(nome) + '</option>'; }).join('');
       bairroSel.innerHTML = '<option value="">Escolhe um bairro...</option>' + bairros + '<option value="__new_named__">+ Novo bairro (com nome)</option><option value="__new_unnamed__">Bairro sem nome</option>';
     }).catch(function() { document.getElementById('registar-local-rua').innerHTML = '<option value="__nova__">➕ Escrever nome da rua</option><option value="__no_name__">📍 Rua sem nome / não oficial</option>'; document.getElementById('registar-local-bairro').innerHTML = '<option value="">Escolhe um bairro...</option><option value="__new_named__">+ Novo bairro (com nome)</option><option value="__new_unnamed__">Bairro sem nome</option>'; });
 
@@ -4612,6 +4823,7 @@ document.getElementById('btn-registar-local-capturar').addEventListener('click',
     document.getElementById('registar-local-preview').style.display = 'block';
     statusEl.className = 'msg msg-muted'; statusEl.textContent = 'A enviar e a verificar a marca de água...';
     uploadFotoComFallback(blob, 'field-photos', 'registo-cidadao').then(function(res) {
+      if (res.erro) { statusEl.className = 'msg msg-error'; statusEl.textContent = res.erro; return; }
       if (res.ok) { registarLocalFotoUrl = res.url; fotoEnviada = true; verificarFimTudo(); }
       else { registarLocalFotoUrl = res.marcador; fotoEnviada = true; verificarFimTudo(); }
     });
@@ -4693,9 +4905,17 @@ function cidadaoLoadStatus() {
   }).then(function(r) { return r.json(); }).then(function(data) {
     var statusEl = document.getElementById('cidadao-verif-status');
     var form = document.getElementById('cidadao-verif-form');
-    if (data.citizen_id_verified) {
+    var estadoCidadao = data.citizen_id_verified ? 'VERIFIED' : data.citizen_id_status;
+    if (estadoCidadao === 'VERIFIED') {
       statusEl.className = 'msg msg-success'; statusEl.textContent = '✅ Verificado — já podes registar locais.';
       form.style.display = 'none';
+    } else if (estadoCidadao === 'PENDING_REVIEW') {
+      statusEl.className = 'msg msg-muted'; statusEl.textContent = '⏳ Em revisão — uma pessoa está a confirmar as tuas fotos. Recebes uma notificação.';
+      form.style.display = 'none';
+    } else if (estadoCidadao === 'REJECTED') {
+      statusEl.className = 'msg msg-error';
+      statusEl.textContent = '❌ Recusada' + (data.rejection_reason ? ': ' + data.rejection_reason : '') + '. Tira as fotos outra vez e volta a enviar.';
+      form.style.display = 'block';
     } else {
       statusEl.className = 'msg msg-error'; statusEl.textContent = '⚠️ Por verificar — obrigatório para registares um local.';
       form.style.display = 'block';
@@ -4739,7 +4959,7 @@ function cidadaoConfigurarCaptura(chave, videoId, canvasId, abrirBtnId, capturar
       setPreviewObjectURL(previewId, blob);
       document.getElementById(previewId).style.display = 'block';
       statusEl.className = 'msg msg-muted'; statusEl.textContent = 'A enviar...';
-      var fileName = 'cidadao-' + chave + '-' + Date.now() + '.jpg';
+      var fileName = getCurrentUserId() + '/cidadao-' + chave + '-' + Date.now() + '.jpg';
       fetch(SUPABASE_URL + '/storage/v1/object/kyc-artifacts/' + fileName, {
         method: 'POST', headers: { 'Authorization': 'Bearer ' + session.access_token, 'apikey': ANON_KEY, 'Content-Type': 'image/jpeg' }, body: blob
       }).then(function(r) {
@@ -4839,7 +5059,7 @@ function kycCapturePhoto(videoElId, canvasElId, statusElId, previewImgId, filePr
     setPreviewObjectURL(previewImgId, blob);
     document.getElementById(previewImgId).style.display = 'block';
     statusEl.className = 'msg msg-muted'; statusEl.textContent = 'A enviar (' + Math.round(blob.size / 1024) + ' KB)...';
-    var fileName = filePrefix + '-' + Date.now() + '.jpg';
+    var fileName = getCurrentUserId() + '/' + nomeFicheiroSeguro(filePrefix) + '-' + Date.now() + '.jpg';
     fetch(SUPABASE_URL + '/storage/v1/object/kyc-artifacts/' + fileName, {
       method: 'POST', headers: { 'Authorization': 'Bearer ' + session.access_token, 'apikey': ANON_KEY, 'Content-Type': 'image/jpeg' }, body: blob
     }).then(function(r) {
@@ -4937,7 +5157,7 @@ document.getElementById('btn-kyc-video-record').addEventListener('click', functi
       return;
     }
     statusEl.className = 'msg msg-muted'; statusEl.textContent = 'A enviar (' + kycVideoDuration.toFixed(1) + 's, ' + Math.round(blob.size / 1024) + ' KB)...';
-    var fileName = 'video-' + Date.now() + '.webm';
+    var fileName = getCurrentUserId() + '/video-' + Date.now() + '.webm';
     fetch(SUPABASE_URL + '/storage/v1/object/kyc-artifacts/' + fileName, {
       method: 'POST', headers: { 'Authorization': 'Bearer ' + session.access_token, 'apikey': ANON_KEY, 'Content-Type': 'video/webm' }, body: blob
     }).then(function(r) {
@@ -5016,7 +5236,7 @@ function loadJoinLinks() {
       return '<div class="list-item">' +
         '<div class="value-plain" style="font-weight:600;">' + (l.role === 'estafeta' ? 'Estafeta' : 'Técnico de campo') + (l.flagged_anomaly ? ' ⚠️ anomalia' : '') + '</div>' +
         '<div style="font-size:11px;color:var(--text-dim);margin:2px 0;">' + l.use_count + '/' + l.max_uses + ' usados · expira ' + new Date(l.expires_at).toLocaleDateString('pt-PT') + (dead ? ' · MORTO' : '') + '</div>' +
-        (dead ? '' : '<div class="btn-row"><button class="btn btn-secondary btn-sm joinlink-copiar" data-token="' + l.token + '">Copiar link</button><button class="btn btn-danger-outline btn-sm joinlink-revogar" data-id="' + l.id + '">Revogar</button></div>') +
+        (dead ? '' : '<div class="btn-row"><button class="btn btn-secondary btn-sm joinlink-copiar" data-token="' + esc(l.token) + '">Copiar link</button><button class="btn btn-danger-outline btn-sm joinlink-revogar" data-id="' + esc(l.id) + '">Revogar</button></div>') +
         '</div>';
     }).join('');
     document.querySelectorAll('.joinlink-copiar').forEach(function(b) {
@@ -5053,35 +5273,44 @@ document.getElementById('btn-joinlink-criar').addEventListener('click', function
 });
 
 function loadPricingAdmin() {
-  fetch(SUPABASE_URL + '/rest/v1/pricing_zones?select=*&order=zone_code.asc', { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token } })
-    .then(function(r) { return r.json(); }).then(function(zones) {
+  var CAMPOS_PRECO = [['base_fee', 'Frete'], ['routing_fee', 'Roteamento'], ['proof_fee', 'Prova'], ['bulky_fee', 'Volumoso'], ['long_wait_fee', 'Espera longa']];
+  fetch(SUPABASE_URL + '/functions/v1/pricing?action=list_zones', { method: 'POST', headers: cabecalhosFuncao(), body: '{}' })
+    .then(function(r) { return r.json(); }).then(function(data) {
       var list = document.getElementById('pricing-zones-list');
-      list.innerHTML = (zones || []).map(function(z) {
-        return '<div class="list-item">' +
-          '<div class="value-plain" style="font-weight:600;">Zona ' + z.zone_code + ' — ' + z.name + '</div>' +
+      if (data.error) { list.innerHTML = '<p class="msg msg-error">' + esc(data.error) + '</p>'; return; }
+      var podeEditar = myRoles.indexOf('super_admin') > -1;
+      list.innerHTML = (data.zones || []).map(function(z) {
+        var chave = esc(z.country_code) + '-' + esc(z.zone_code);
+        return '<div class="list-item" data-pz="' + chave + '" data-pais="' + esc(z.country_code) + '" data-zona="' + esc(z.zone_code) + '">' +
+          '<div class="value-plain" style="font-weight:600;">' + esc(z.country_code) + ' · Zona ' + esc(z.zone_code) + ' — ' + esc(z.name) + ' (' + esc(z.currency_code || '') + ')</div>' +
           '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' +
-            '<div><span class="field-inline-label">Frete (Kz)</span><input class="input pz-frete" data-zone="' + z.zone_code + '" style="width:88px;" type="number" value="' + z.base_fee + '" /></div>' +
-            '<div><span class="field-inline-label">Roteamento (Kz)</span><input class="input pz-roteamento" data-zone="' + z.zone_code + '" style="width:88px;" type="number" value="' + z.routing_fee + '" /></div>' +
-            '<div><span class="field-inline-label">Prova (Kz)</span><input class="input pz-prova" data-zone="' + z.zone_code + '" style="width:88px;" type="number" value="' + z.proof_fee + '" /></div>' +
+          CAMPOS_PRECO.map(function(c) {
+            return '<div><span class="field-inline-label">' + c[1] + '</span><input class="input pz-campo" data-campo="' + c[0] + '" style="width:88px;" type="number" min="0" step="1" value="' + esc(z[c[0]] != null ? z[c[0]] : '') + '"' + (podeEditar ? '' : ' disabled') + ' /></div>';
+          }).join('') +
           '</div>' +
-          '<button data-zone="' + z.zone_code + '" class="btn btn-secondary btn-sm pz-guardar" style="margin-top:8px;">Guardar</button>' +
+          (podeEditar ? '<button class="btn btn-secondary btn-sm pz-guardar" style="margin-top:8px;">Guardar</button><span class="pz-msg" style="font-size:11px;margin-left:8px;"></span>' : '') +
           '</div>';
-      }).join('');
-      document.querySelectorAll('.pz-guardar').forEach(function(b) {
-        b.addEventListener('click', function() {
-          var z = b.dataset.zone;
-          var frete = parseFloat(document.querySelector('.pz-frete[data-zone="' + z + '"]').value);
-          var roteamento = parseFloat(document.querySelector('.pz-roteamento[data-zone="' + z + '"]').value);
-          var prova = parseFloat(document.querySelector('.pz-prova[data-zone="' + z + '"]').value);
-          fetch(SUPABASE_URL + '/functions/v1/pricing?action=admin_update_zone', {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
-            body: JSON.stringify({ zone_code: z, base_fee: frete, routing_fee: roteamento, proof_fee: prova })
-          }).then(function(r) { return r.json(); }).then(function(data) {
-            if (data.error) alert(data.error); else loadPricingAdmin();
+      }).join('') || '<p class="msg msg-muted">Sem bandas de preço.</p>';
+      list.querySelectorAll('[data-pz]').forEach(function(card) {
+        var botao = card.querySelector('.pz-guardar');
+        if (!botao) return;
+        botao.addEventListener('click', function() {
+          var corpo = { country_code: card.dataset.pais, zone_code: card.dataset.zona }, errado = false;
+          card.querySelectorAll('.pz-campo').forEach(function(inp) {
+            if (inp.value === '') return;
+            var v = Number(inp.value);
+            if (!isFinite(v) || v < 0) errado = true; else corpo[inp.dataset.campo] = v;
           });
+          var m = card.querySelector('.pz-msg');
+          if (errado) { m.textContent = 'Valores têm de ser números ≥ 0.'; return; }
+          m.textContent = 'A guardar...';
+          fetch(SUPABASE_URL + '/functions/v1/pricing?action=admin_update_zone', { method: 'POST', headers: cabecalhosFuncao(), body: JSON.stringify(corpo) })
+            .then(function(r) { return r.json(); }).then(function(d) {
+              m.textContent = d.error ? String(d.error) : 'Guardado.';
+            }).catch(function() { m.textContent = 'Erro de ligação.'; });
         });
       });
-    });
+    }).catch(function() {});
 
   fetch(SUPABASE_URL + '/rest/v1/usage_events?select=amount_total,amount_driver,amount_platform,is_free_pilot,event_type', {
     headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
@@ -5120,12 +5349,12 @@ function loadUnassignedDeliveries() {
     deliveries.forEach(function(d) {
       var div = document.createElement('div');
       div.className = 'list-item';
-      var options = estafetas.map(function(e) { return '<option value="' + e.id + '">' + e.email + '</option>'; }).join('');
+      var options = estafetas.map(function(e) { return '<option value="' + esc(e.id) + '">' + esc(e.email) + '</option>'; }).join('');
       div.innerHTML =
-        '<div class="value-md" style="color:var(--accent);font-weight:600;">' + d.tracking_code + '</div>' +
-        '<div style="font-size:11.5px;color:var(--text-dim);margin:2px 0 8px;">' + d.recipient_name + '</div>' +
+        '<div class="value-md" style="color:var(--accent);font-weight:600;">' + esc(d.tracking_code) + '</div>' +
+        '<div style="font-size:11.5px;color:var(--text-dim);margin:2px 0 8px;">' + esc(d.recipient_name) + '</div>' +
         '<select class="input assign-select" style="height:40px;margin-bottom:8px;">' + options + '</select>' +
-        '<button data-delivery="' + d.id + '" class="assign-btn btn btn-success-solid btn-sm">Atribuir</button>';
+        '<button data-delivery="' + esc(d.id) + '" class="assign-btn btn btn-success-solid btn-sm">Atribuir</button>';
       list.appendChild(div);
     });
     document.querySelectorAll('.assign-btn').forEach(function(b) {
@@ -5179,11 +5408,10 @@ function renderAuditLog() {
   logs.slice(0, 15).forEach(function(log) {
     var div = document.createElement('div');
     div.className = 'list-item';
-    div.dataset.liveDeliveryId = d.id;
     var when = new Date(log.created_at).toLocaleString('pt-PT');
     div.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">' +
-        '<div><div class="value-plain">' + (AUDIT_LABELS[log.action] || log.action) + '</div><div style="font-size:11px;color:var(--text-dim);margin-top:2px;">' + (log.entity_type || '') + ' · ' + when + '</div></div>' +
+        '<div><div class="value-plain">' + esc(AUDIT_LABELS[log.action] || log.action) + '</div><div style="font-size:11px;color:var(--text-dim);margin-top:2px;">' + esc(log.entity_type || '') + ' · ' + esc(when) + '</div></div>' +
       '</div>';
     list.appendChild(div);
   });
@@ -5253,7 +5481,7 @@ function setupInviteForm() {
   fetch(SUPABASE_URL + '/rest/v1/provinces?select=id,name&order=name.asc', { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token } })
     .then(function(r) { return r.json(); }).then(function(rows) {
       var sel = document.getElementById('invite-province');
-      sel.innerHTML = rows.map(function(p) { return '<option value="' + p.id + '">' + p.name + '</option>'; }).join('');
+      sel.innerHTML = rows.map(function(p) { return '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>'; }).join('');
     });
 
   roleSelect.addEventListener('change', toggleInviteScopeFields);
@@ -5273,7 +5501,7 @@ function loadMunicipalitiesForInvite() {
   // Reutiliza a lista de províncias já carregada para preencher municípios de todas (simplificado: carrega todos)
   fetch(SUPABASE_URL + '/rest/v1/municipalities?select=id,name,provinces(name)&order=name.asc', { headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token } })
     .then(function(r) { return r.json(); }).then(function(rows) {
-      muniSel.innerHTML = rows.map(function(m) { return '<option value="' + m.id + '">' + m.name + (m.provinces ? ' (' + m.provinces.name + ')' : '') + '</option>'; }).join('');
+      muniSel.innerHTML = rows.map(function(m) { return '<option value="' + esc(m.id) + '">' + esc(m.name + (m.provinces ? ' (' + m.provinces.name + ')' : '')) + '</option>'; }).join('');
     });
 }
 
@@ -5353,7 +5581,7 @@ document.getElementById('btn-export-geojson').addEventListener('click', function
 // /routing como autoridade online. Sem rede/grafo, devolve uma rota de contingência explícita.
 var ANGOLA_ROUTING_ENGINE = (function () {
   var CFG = {
-    endpoint: SUPABASE_URL + '/functions/v1/routing',
+    endpoint: SUPABASE_URL + '/functions/v1/geocode?action=optimize',
     defaultSpeedKmh: 20,
     maxAlternatives: 3,
     trafficEnabled: true,
@@ -5405,16 +5633,15 @@ var ANGOLA_ROUTING_ENGINE = (function () {
     options=options||{};
     if(!validPoint(start)||!validPoint(end)) return Promise.reject(new Error('Pontos de rota inválidos'));
     if(!navigator.onLine && CFG.offlineEnabled) { var off=offlineRoute(start,end,options); if(off) return Promise.resolve(off); }
-    var payload={version:'1.0',start:start,end:end,alternatives:Math.min(CFG.maxAlternatives,Math.max(1,Number(options.alternatives)||1)),restrictions:options.restrictions||{},traffic:CFG.trafficEnabled ? (options.traffic!==false) : false,traffic_profile:options.traffic_profile||'live',offline:false};
-    return fetch(CFG.endpoint+'?action=route',{method:'POST',headers:{'Content-Type':'application/json','apikey':ANON_KEY,'Authorization':'Bearer '+(session&&session.access_token||'')},body:JSON.stringify(payload)})
+    // "lng,lat;lng,lat" (6 casas decimais = ~10 cm) — o formato que a função geocode aceita.
+    var coords=[start,end].map(function(p){return num(p.longitude).toFixed(6)+','+num(p.latitude).toFixed(6);}).join(';');
+    return fetch(CFG.endpoint,{method:'POST',headers:cabecalhosFuncao(),body:JSON.stringify({coords_string:coords})})
       .then(function(r){if(!r.ok) throw new Error('routing_http_'+r.status);return r.json();})
       .then(function(data){
-        if(!data || data.error) throw new Error(data&&data.error||'routing_invalid_response');
-        data.source=data.source||'angola_localiza_routing';
-        data.eta_minutes=data.eta_minutes!=null?data.eta_minutes:data.duration_minutes;
-        data.alternatives=data.alternatives||[];
-        data.traffic_used=!!data.traffic_used;
-        return data;
+        var trip=data&&data.trips&&data.trips[0];
+        if(!trip || data.error) throw new Error(data&&data.error||'routing_invalid_response');
+        var minutos=Math.round((Number(trip.duration)||0)/60+(Number(options.serviceMinutes)||0));
+        return {source:'locationiq',coordinates:[start,end],distance_meters:Number(trip.distance)||0,duration_minutes:minutos,eta_minutes:minutos,alternatives:[],traffic_used:false,offline:false};
       }).catch(function(err){
         if(CFG.offlineEnabled){var fallback=offlineRoute(start,end,options);if(fallback)return fallback;}
         throw err;
@@ -5545,6 +5772,37 @@ document.querySelectorAll('.entregas-filter-btn').forEach(function(b) {
 });
 document.getElementById('minhas-entregas-search').addEventListener('input', renderMinhasEntregas);
 
+function estafetaMostrarBotaoOnline(online) {
+  var b = document.getElementById('btn-estafeta-online');
+  if (!b) return;
+  b.style.display = 'block';
+  b.dataset.online = online ? '1' : '0';
+  b.textContent = online ? 'Ficar indisponível' : 'Ficar disponível';
+  b.className = online ? 'btn btn-secondary' : 'btn btn-primary';
+}
+document.getElementById('btn-estafeta-online').addEventListener('click', function() {
+  var b = this, querOnline = b.dataset.online !== '1';
+  var msg = document.getElementById('estafeta-disponiveis-msg');
+  b.disabled = true;
+  function enviar(pos) {
+    fetch(SUPABASE_URL + '/functions/v1/driver-kyc?action=set_online', {
+      method: 'POST', headers: cabecalhosFuncao(),
+      body: JSON.stringify(Object.assign({ online: querOnline }, pos || {}))
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      b.disabled = false;
+      if (d.error) {
+        msg.textContent = d.error === 'MOTORISTA_KYC_NAO_APROVADO' ? 'A tua candidatura a motorista ainda não foi aprovada.' : String(d.error);
+        return;
+      }
+      loadPedidosDisponiveisEstafeta();
+    }).catch(function() { b.disabled = false; msg.textContent = 'Erro de ligação.'; });
+  }
+  if (querOnline && navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(p) { enviar({ latitude: p.coords.latitude, longitude: p.coords.longitude }); },
+      function() { enviar(null); }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 });
+  } else enviar(null);
+});
+
 function loadPedidosDisponiveisEstafeta() {
   var box = document.getElementById('estafeta-disponiveis-box');
   if (!box || !session || myRoles.indexOf('estafeta') === -1) return;
@@ -5564,7 +5822,8 @@ function loadPedidosDisponiveisEstafeta() {
     var data=result.data||{};
     if (!result.ok || data.error) throw new Error(data.error || 'Não foi possível carregar os pedidos.');
     var driver=data.driver||{};
-    estado.textContent = driver.online ? ('🟢 Online · ' + (driver.vehicle_type || 'veículo não configurado') + (driver.vehicle_capacity_kg != null ? ' · ' + driver.vehicle_capacity_kg + ' kg' : '')) : ('⚪ Offline · coloca-te online para receber pedidos');
+    estado.textContent = driver.online ? ('🟢 Disponível · ' + (driver.vehicle_type || 'veículo não configurado') + (driver.vehicle_capacity_kg != null ? ' · ' + driver.vehicle_capacity_kg + ' kg' : '')) : ('⚪ Indisponível · toca em "Ficar disponível" para receber pedidos');
+    estafetaMostrarBotaoOnline(!!driver.online);
     list.innerHTML='';
     var pedidos=data.deliveries||[];
     if (!driver.online || pedidos.length===0) { empty.style.display='block'; return; }
@@ -5710,30 +5969,30 @@ function renderMinhasEntregas() {
     var actions = '';
     if (souCidadaoNaLista) {
       if (['CREATED', 'ASSIGNED', 'PICKED_UP', 'IN_TRANSIT'].indexOf(d.status) > -1) {
-        actions += '<button data-id="' + d.id + '" data-urgente="' + (!d.is_urgent) + '" class="entrega-urgente-btn btn btn-secondary btn-sm">' + (d.is_urgent ? 'Desmarcar urgente' : '🔴 Marcar urgente') + '</button>';
+        actions += '<button data-id="' + esc(d.id) + '" data-urgente="' + (!d.is_urgent) + '" class="entrega-urgente-btn btn btn-secondary btn-sm">' + (d.is_urgent ? 'Desmarcar urgente' : '🔴 Marcar urgente') + '</button>';
       }
       if (['CREATED', 'ASSIGNED'].indexOf(d.status) > -1) {
-        actions += '<button data-id="' + d.id + '" data-status="CANCELLED" class="entrega-status-btn btn btn-danger-outline btn-sm">Cancelar entrega</button>';
+        actions += '<button data-id="' + esc(d.id) + '" data-status="CANCELLED" class="entrega-status-btn btn btn-danger-outline btn-sm">Cancelar entrega</button>';
       }
     } else if (!souOperadorPostal) {
       if (next) {
-        actions += '<button data-id="' + d.id + '" data-status="' + next + '" class="entrega-status-btn btn btn-success-solid btn-sm">' + NEXT_ACTION_LABEL[next] + '</button>';
+        actions += '<button data-id="' + esc(d.id) + '" data-status="' + next + '" class="entrega-status-btn btn btn-success-solid btn-sm">' + NEXT_ACTION_LABEL[next] + '</button>';
       }
       if (d.status === 'OUT_FOR_DELIVERY') {
-        actions += '<button data-id="' + d.id + '" data-status="FAILED" class="entrega-falha-btn btn btn-danger-outline btn-sm">Falhou</button>';
+        actions += '<button data-id="' + esc(d.id) + '" data-status="FAILED" class="entrega-falha-btn btn btn-danger-outline btn-sm">Falhou</button>';
       }
       if (d.status === 'FAILED') {
-        actions += '<button data-id="' + d.id + '" data-status="ASSIGNED" class="entrega-status-btn btn btn-secondary btn-sm">🔁 Reagendar tentativa</button>';
+        actions += '<button data-id="' + esc(d.id) + '" data-status="ASSIGNED" class="entrega-status-btn btn btn-secondary btn-sm">🔁 Reagendar tentativa</button>';
       }
     }
     if (myRoles.indexOf('estafeta') > -1 && d.assigned_driver === getCurrentUserId() && ['DELIVERED','FAILED','CANCELLED'].indexOf(d.status) === -1) {
-      actions += '<button data-id="' + d.id + '" class="tracking-share-btn btn btn-secondary btn-sm">📡 Partilhar localização</button>';
+      actions += '<button data-id="' + esc(d.id) + '" class="tracking-share-btn btn btn-secondary btn-sm">📡 Partilhar localização</button>';
     }
     if ((!souVisaoGlobal || myRoles.indexOf('super_admin') > -1) && d.status !== 'CANCELLED') {
-      actions += '<button data-id="' + d.id + '" data-titulo="Entrega #' + d.tracking_code + '" class="entrega-chat-btn btn btn-secondary btn-sm">💬 Chat</button>';
+      actions += '<button data-id="' + esc(d.id) + '" data-titulo="Entrega #' + d.tracking_code + '" class="entrega-chat-btn btn btn-secondary btn-sm">💬 Chat</button>';
     }
     if (myRoles.indexOf('super_admin') > -1) {
-      actions += '<button data-id="' + d.id + '" class="entrega-eliminar-btn btn btn-danger-outline btn-sm">🗑️ Eliminar</button>';
+      actions += '<button data-id="' + esc(d.id) + '" class="entrega-eliminar-btn btn btn-danger-outline btn-sm">🗑️ Eliminar</button>';
     }
     var whatsappHref = '';
     if (d.recipient_phone) {
@@ -5746,21 +6005,21 @@ function renderMinhasEntregas() {
         '<div>' +
           (ordemSugeridaMap[d.id] ? '<div style="display:inline-block;background:var(--accent);color:#FBF6EE;font-weight:700;font-size:11px;border-radius:999px;padding:1px 8px;margin-bottom:4px;">🧭 ' + ordemSugeridaMap[d.id] + 'ª paragem' + (tempoEstimadoMap[d.id] ? ' · ≈' + tempoEstimadoMap[d.id] + ' min' : '') + '</div>' : '') +
           (d.is_urgent ? '<div style="display:inline-block;background:var(--danger);color:#FBF6EE;font-weight:700;font-size:11px;border-radius:999px;padding:1px 8px;margin-bottom:4px;margin-left:4px;">🔴 Urgente</div>' : '') +
-          (souVisaoGlobal && d.driver_email ? '<div style="font-size:10.5px;color:var(--verified);">🧑‍✈️ ' + d.driver_email + '</div>' : '') +
-          (d.origin_postal_code || d.origin_plus_code ? '<div style="font-size:10.5px;color:var(--text-dim);">📤 Recolha: ' + (d.origin_postal_code || '') + (d.origin_plus_code ? ' · ' + d.origin_plus_code : '') + '</div>' : '') +
-          '<div class="value-md" style="color:var(--accent);font-weight:700;font-size:15px;margin-top:2px;">📥 ' + (addr.postal_code || 'sem código') + '</div>' +
-          (addr.plus_code ? '<div style="font-size:10.5px;color:var(--text-faint);">' + addr.plus_code + '</div>' : '') +
-          '<div style="font-size:10px;color:var(--text-faint);margin-top:2px;">#' + d.tracking_code + '</div>' +
-          '<div style="font-size:12.5px;font-weight:600;margin-top:4px;">' + d.recipient_name + '</div>' +
-          (addr.streets ? '<div style="font-size:11px;color:var(--text-dim);margin-top:2px;">' + addr.streets.name + (addr.quadras ? ' · Quadra ' + addr.quadras.code : '') + (addr.house_number ? ' · nº ' + addr.house_number : '') + '</div>' : '') +
-          (addr.reference ? '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">📍 ' + addr.reference + '</div>' : '') +
-          (d.instructions ? '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">📝 ' + d.instructions + '</div>' : '') +
-          '<div class="live-status" style="font-size:11.5px;color:var(--text-dim);margin-top:4px;">' + (STATUS_LABEL[d.status] || d.status) + '</div>' +
+          (souVisaoGlobal && d.driver_email ? '<div style="font-size:10.5px;color:var(--verified);">🧑‍✈️ ' + esc(d.driver_email) + '</div>' : '') +
+          (d.origin_postal_code || d.origin_plus_code ? '<div style="font-size:10.5px;color:var(--text-dim);">📤 Recolha: ' + esc((d.origin_postal_code || '') + (d.origin_plus_code ? ' · ' + d.origin_plus_code : '')) + '</div>' : '') +
+          '<div class="value-md" style="color:var(--accent);font-weight:700;font-size:15px;margin-top:2px;">📥 ' + esc(addr.postal_code || 'sem código') + '</div>' +
+          (addr.plus_code ? '<div style="font-size:10.5px;color:var(--text-faint);">' + esc(addr.plus_code) + '</div>' : '') +
+          '<div style="font-size:10px;color:var(--text-faint);margin-top:2px;">#' + esc(d.tracking_code) + '</div>' +
+          '<div style="font-size:12.5px;font-weight:600;margin-top:4px;">' + esc(d.recipient_name) + '</div>' +
+          (addr.streets ? '<div style="font-size:11px;color:var(--text-dim);margin-top:2px;">' + esc(addr.streets.name + (addr.quadras ? ' · Quadra ' + addr.quadras.code : '') + (addr.house_number ? ' · nº ' + addr.house_number : '')) + '</div>' : '') +
+          (addr.reference ? '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">📍 ' + esc(addr.reference) + '</div>' : '') +
+          (d.instructions ? '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">📝 ' + esc(d.instructions) + '</div>' : '') +
+          '<div class="live-status" style="font-size:11.5px;color:var(--text-dim);margin-top:4px;">' + esc(STATUS_LABEL[d.status] || d.status) + '</div>' +
           '<div class="live-location" style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">📡 Aguardando localização do estafeta</div>' +
         '</div>' +
         '<div style="display:flex;gap:6px;">' +
-          (whatsappHref ? '<a href="' + whatsappHref + '" target="_blank" class="icon-btn" aria-label="WhatsApp" style="text-decoration:none;">💬</a>' : '') +
-          (d.recipient_phone ? '<a href="tel:' + d.recipient_phone + '" class="icon-btn" aria-label="Ligar" style="text-decoration:none;">📞</a>' : '') +
+          (whatsappHref ? '<a href="' + esc(whatsappHref) + '" target="_blank" rel="noopener" class="icon-btn" aria-label="WhatsApp" style="text-decoration:none;">💬</a>' : '') +
+          (d.recipient_phone ? '<a href="tel:' + esc(String(d.recipient_phone).replace(/[^0-9+]/g, '')) + '" class="icon-btn" aria-label="Ligar" style="text-decoration:none;">📞</a>' : '') +
         '</div>' +
       '</div>' +
       (actions ? '<div class="btn-row" style="margin-top:10px;">' + actions + '</div>' : '');
@@ -5894,7 +6153,8 @@ document.getElementById('pickup-photo-input').addEventListener('change', functio
       canvas.toBlob(function(blob) {
         setPreviewObjectURL(preview.id, blob); preview.style.display = 'block';
         statusEl.textContent = 'A enviar (' + Math.round(blob.size / 1024) + ' KB)...';
-        uploadFotoComFallback(blob, 'field-photos', 'pickup').then(function(res) {
+        uploadFotoComFallback(blob, 'delivery-proofs', 'pickup').then(function(res) {
+          if (res.erro) { statusEl.className = 'msg msg-error'; statusEl.textContent = res.erro; return; }
           if (res.ok) {
             pickupPhotoUrl = res.url; statusEl.className = 'msg msg-success'; statusEl.textContent = 'Foto pronta.';
           } else {
@@ -5978,7 +6238,8 @@ document.getElementById('pod-photo-input').addEventListener('change', function(e
       canvas.toBlob(function(blob) {
         setPreviewObjectURL(preview.id, blob); preview.style.display = 'block';
         statusEl.textContent = 'A enviar (' + Math.round(blob.size / 1024) + ' KB)...';
-        uploadFotoComFallback(blob, 'field-photos', 'pod').then(function(res) {
+        uploadFotoComFallback(blob, 'delivery-proofs', 'pod').then(function(res) {
+          if (res.erro) { statusEl.className = 'msg msg-error'; statusEl.textContent = res.erro; return; }
           if (res.ok) { podPhotoUrl = res.url; statusEl.className = 'msg msg-success'; statusEl.textContent = 'Foto pronta.'; }
           else { podPhotoUrl = res.marcador; statusEl.className = 'msg msg-success'; statusEl.textContent = '📴 Sem rede — foto guardada, envia-se sozinha mais tarde.'; }
         });
@@ -6048,7 +6309,8 @@ document.getElementById('btn-pod-confirmar').addEventListener('click', function(
 
   if (podSigHasContent) {
     podSigCanvas.toBlob(function(blob) {
-      uploadFotoComFallback(blob, 'field-photos', 'sig', 'image/png').then(function(res) {
+      uploadFotoComFallback(blob, 'delivery-proofs', 'sig', 'image/png').then(function(res) {
+        if (res.erro) { msg.className = 'msg msg-error'; msg.textContent = res.erro; return; }
         if (res.ok) finish(res.url, false); else finish(res.marcador, true);
       });
     }, 'image/png');
@@ -6170,7 +6432,7 @@ function campoLoadInfillOptions(streetId) {
   }).then(function(r) { return r.json(); }).then(function(data) {
     var sel = document.getElementById('campo-infill-base');
     var numbers = data.house_numbers || [];
-    sel.innerHTML = numbers.length ? numbers.map(function(n) { return '<option value="' + n + '">nº ' + n + '</option>'; }).join('') : '<option value="">(sem números ainda nesta rua)</option>';
+    sel.innerHTML = numbers.length ? numbers.map(function(n) { return '<option value="' + esc(n) + '">nº ' + esc(n) + '</option>'; }).join('') : '<option value="">(sem números ainda nesta rua)</option>';
     campoInfillBase = numbers[0] || null;
     sel.onchange = function() { campoInfillBase = sel.value || null; campoUpdateSubmitState(); };
     campoUpdateSubmitState();
@@ -6185,13 +6447,13 @@ function campoLoadStreetsForQuadra(lat, lng) {
     campoQuadraCode = data.quadra_code;
     document.getElementById('campo-quadra-chip').textContent = 'Quadra ' + data.quadra_code + ' · ' + data.kind + ' · ≈' + Math.round(data.area_m2) + ' m²';
     var sel = document.getElementById('campo-street-select');
-    var existing = (data.streets || []).map(function(s) { return '<option value="' + s.id + '">' + s.name + ' (próx. nº ' + s.next_seq + ')</option>'; }).join('');
+    var existing = (data.streets || []).map(function(s) { return '<option value="' + esc(s.id) + '">' + esc(s.name) + ' (próx. nº ' + esc(s.next_seq) + ')</option>'; }).join('');
     sel.innerHTML = '<option value="">Escolhe uma rua...</option>' + existing +
       '<option value="__new_named__">+ Nova rua (com nome)</option>' +
       '<option value="__new_unnamed__">+ Nova rua sem nome (Rua S/Nº)</option>';
 
     var selBairro = document.getElementById('campo-neighborhood-select');
-    var bairrosExistentes = (data.neighborhoods_nearby || []).map(function(nome) { return '<option value="' + nome.replace(/"/g, '&quot;') + '">' + nome + '</option>'; }).join('');
+    var bairrosExistentes = (data.neighborhoods_nearby || []).map(function(nome) { return '<option value="' + esc(nome) + '">' + esc(nome) + '</option>'; }).join('');
     selBairro.innerHTML = '<option value="">Escolhe um bairro...</option>' + bairrosExistentes +
       '<option value="__new_named__">+ Novo bairro (com nome)</option>' +
       '<option value="__new_unnamed__">+ Novo bairro (sem nome)</option>';
@@ -6259,9 +6521,9 @@ function campoLoadReverificar() {
     badge.style.display = 'inline-block'; badge.textContent = flagged.length;
     document.getElementById('campo-reverificar-list').innerHTML = flagged.map(function(a) {
       return '<div class="list-item">' +
-        '<div class="value-plain" style="color:var(--accent);font-weight:600;">' + (a.postal_code || a.plus_code || 'sem código') + '</div>' +
-        '<div style="font-size:11px;color:var(--danger);margin-top:2px;">Motivo: ' + a.reason + '</div>' +
-        '<div style="font-size:11px;color:var(--text-dim);margin-top:2px;">' + (a.reference || '') + ' · ' + a.latitude.toFixed(4) + ', ' + a.longitude.toFixed(4) + '</div>' +
+        '<div class="value-plain" style="color:var(--accent);font-weight:600;">' + esc(a.postal_code || a.plus_code || 'sem código') + '</div>' +
+        '<div style="font-size:11px;color:var(--danger);margin-top:2px;">Motivo: ' + esc(a.reason) + '</div>' +
+        '<div style="font-size:11px;color:var(--text-dim);margin-top:2px;">' + esc(a.reference || '') + ' · ' + Number(a.latitude).toFixed(4) + ', ' + Number(a.longitude).toFixed(4) + '</div>' +
         '</div>';
     }).join('') + '<p style="font-size:11px;color:var(--text-dim);margin-top:8px;">Vai ao local e captura de novo abaixo — o sistema deteta sozinho que é a mesma morada (a 15 m) e o supervisor pode fundir para atualizar.</p>';
   }).catch(function() {});
@@ -6349,7 +6611,7 @@ function campoCaptureGps() {
         campoLocation.sugestaoBairroExterna = a.suburb || a.neighbourhood || a.quarter || a.residential || null;
         campoTentarInjetarSugestaoExterna();
         return fetch(SUPABASE_URL + '/functions/v1/generate-postal-code', {
-          method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY },
+          method: 'POST', headers: cabecalhosFuncao(),
           body: JSON.stringify({ latitude: lat, longitude: lng, province_name: province })
         });
       }).then(function(r) { return r.json(); }).then(function(data) {
@@ -6390,7 +6652,6 @@ function campoCaptureGps() {
 
     campoUpdateSubmitState();
   }
-  readOnce();
 }
 
 document.getElementById('btn-campo-gps').addEventListener('click', campoCaptureGps);
@@ -6464,6 +6725,7 @@ function campoSetupPhotoInput(inputId, statusId, previewId, onDone) {
 
           var fileName = campoDeviceId + '-' + inputId + '-' + Date.now();
           uploadFotoComFallback(blob, 'field-photos', fileName).then(function(res) {
+            if (res.erro) { statusEl.className = 'msg msg-error'; statusEl.textContent = res.erro; return; }
             if (res.ok) {
               onDone(res.url);
               statusEl.className = 'msg msg-success';
@@ -6595,17 +6857,17 @@ function loadValidar() {
       div.className = 'list-item';
       var isDuplicate = rec.status === 'DUPLICATE';
       var actions = isDuplicate
-        ? '<button data-id="' + rec.id + '" data-lat="' + rec.latitude + '" data-lng="' + rec.longitude + '" data-decision="merge" class="validar-btn btn btn-success-solid btn-sm">Fundir com existente</button>' +
-          '<button data-id="' + rec.id + '" data-lat="' + rec.latitude + '" data-lng="' + rec.longitude + '" data-decision="approve" class="validar-btn btn btn-secondary btn-sm">Aceitar como novo</button>' +
-          '<button data-id="' + rec.id + '" data-decision="reject" class="validar-btn btn btn-danger-outline btn-sm">Rejeitar</button>'
-        : '<button data-id="' + rec.id + '" data-lat="' + rec.latitude + '" data-lng="' + rec.longitude + '" data-decision="approve" class="validar-btn btn btn-success-solid btn-sm">Aprovar</button>' +
-          '<button data-id="' + rec.id + '" data-decision="duplicate" class="validar-btn btn btn-secondary btn-sm">Duplicado</button>' +
-          '<button data-id="' + rec.id + '" data-decision="reject" class="validar-btn btn btn-danger-outline btn-sm">Rejeitar</button>';
+        ? '<button data-id="' + esc(rec.id) + '" data-lat="' + esc(rec.latitude) + '" data-lng="' + esc(rec.longitude) + '" data-decision="merge" class="validar-btn btn btn-success-solid btn-sm">Fundir com existente</button>' +
+          '<button data-id="' + esc(rec.id) + '" data-lat="' + esc(rec.latitude) + '" data-lng="' + esc(rec.longitude) + '" data-decision="approve" class="validar-btn btn btn-secondary btn-sm">Aceitar como novo</button>' +
+          '<button data-id="' + esc(rec.id) + '" data-decision="reject" class="validar-btn btn btn-danger-outline btn-sm">Rejeitar</button>'
+        : '<button data-id="' + esc(rec.id) + '" data-lat="' + esc(rec.latitude) + '" data-lng="' + esc(rec.longitude) + '" data-decision="approve" class="validar-btn btn btn-success-solid btn-sm">Aprovar</button>' +
+          '<button data-id="' + esc(rec.id) + '" data-decision="duplicate" class="validar-btn btn btn-secondary btn-sm">Duplicado</button>' +
+          '<button data-id="' + esc(rec.id) + '" data-decision="reject" class="validar-btn btn btn-danger-outline btn-sm">Rejeitar</button>';
       div.innerHTML =
-        (isDuplicate ? '<div style="color:var(--danger);font-size:11px;font-weight:600;margin-bottom:4px;">⚠️ POSSÍVEL DUPLICADO' + (rec.duplicate_override_reason ? ' — agente diz: "' + rec.duplicate_override_reason + '"' : '') + '</div>' : '') +
-        '<div class="value-plain">' + ((rec.streets && rec.streets.name) || '(rua não indicada)') + (rec.quadras ? ' · Quadra ' + rec.quadras.code : '') + '</div>' +
-        '<div style="font-size:11.5px;color:var(--text-dim);margin:2px 0 8px;">' + (rec.neighborhood_name || '') + ' · ' + rec.latitude.toFixed(4) + ', ' + rec.longitude.toFixed(4) + '</div>' +
-        (rec.preview_house_number != null ? '<div style="font-size:11.5px;color:var(--accent);margin-bottom:8px;">🔢 Vai ficar: nº ' + rec.preview_house_number + (rec.infill_base_house_number ? ' (porta intercalada)' : '') + '</div>' : '') +
+        (isDuplicate ? '<div style="color:var(--danger);font-size:11px;font-weight:600;margin-bottom:4px;">⚠️ POSSÍVEL DUPLICADO' + (rec.duplicate_override_reason ? ' — agente diz: "' + esc(rec.duplicate_override_reason) + '"' : '') + '</div>' : '') +
+        '<div class="value-plain">' + esc(((rec.streets && rec.streets.name) || '(rua não indicada)') + (rec.quadras ? ' · Quadra ' + rec.quadras.code : '')) + '</div>' +
+        '<div style="font-size:11.5px;color:var(--text-dim);margin:2px 0 8px;">' + esc(rec.neighborhood_name || '') + ' · ' + Number(rec.latitude).toFixed(4) + ', ' + Number(rec.longitude).toFixed(4) + '</div>' +
+        (rec.preview_house_number != null ? '<div style="font-size:11.5px;color:var(--accent);margin-bottom:8px;">🔢 Vai ficar: nº ' + esc(rec.preview_house_number) + (rec.infill_base_house_number ? ' (porta intercalada)' : '') + '</div>' : '') +
         (rec.watermark_match === true ? '<div style="font-size:11px;color:var(--success);margin-bottom:8px;">✅ Marca de água confere com a localização</div>' : rec.watermark_match === false ? '<div style="font-size:11px;color:var(--danger);margin-bottom:8px;">⚠️ Marca de água não confere — revê com atenção</div>' : '') +
         '<div class="btn-row">' + actions + '</div>';
       list.appendChild(div);
@@ -6674,14 +6936,14 @@ document.getElementById('btn-quadra-aqui').addEventListener('click', function() 
       var streetsList = document.getElementById('quadra-streets-list');
       streetsList.innerHTML = (data.streets || []).map(function(s) {
         return '<div class="list-item">' +
-          '<div class="value-plain" style="font-weight:600;">' + s.name + '</div>' +
-          '<div style="font-size:11px;color:var(--text-dim);margin:2px 0 6px;">próx. nº ' + s.next_seq + ' · modo atual: ' + s.numbering_mode + '</div>' +
+          '<div class="value-plain" style="font-weight:600;">' + esc(s.name) + '</div>' +
+          '<div style="font-size:11px;color:var(--text-dim);margin:2px 0 6px;">próx. nº ' + esc(s.next_seq) + ' · modo atual: ' + esc(s.numbering_mode) + '</div>' +
           '<div class="btn-row" style="flex-wrap:wrap;gap:6px;">' +
-            '<select class="input street-mode-select" data-street="' + s.id + '" style="width:140px;">' +
+            '<select class="input street-mode-select" data-street="' + esc(s.id) + '" style="width:140px;">' +
               '<option value="SEQUENCIAL"' + (s.numbering_mode === 'SEQUENCIAL' ? ' selected' : '') + '>Sequencial</option>' +
               '<option value="METRICO"' + (s.numbering_mode === 'METRICO' ? ' selected' : '') + '>Métrico</option>' +
             '</select>' +
-            '<button class="btn btn-secondary btn-sm street-mode-guardar" data-street="' + s.id + '">Guardar modo</button>' +
+            '<button class="btn btn-secondary btn-sm street-mode-guardar" data-street="' + esc(s.id) + '">Guardar modo</button>' +
           '</div></div>';
       }).join('') || '<p class="msg msg-muted">Sem ruas ainda nesta quadra.</p>';
 
@@ -6911,7 +7173,7 @@ document.getElementById('btn-quadra-fechar').addEventListener('click', function(
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
-      navigator.serviceWorker.register('sw.js?v=20260926-9')
+      navigator.serviceWorker.register('sw.js?v=20260930-1')
         .then(function(reg) { reg.update(); console.log('Motor offline (PWA) ativado com sucesso!'); })
         .catch(function(err) { console.error('Erro ao ativar o PWA:', err); });
     });
