@@ -33,6 +33,20 @@ jobs:
           if missing:
               raise SystemExit(f"Missing required element(s): {missing}")
 
+          # Funções do servidor desligadas (respondem 410) ou que não existem:
+          # o site não as pode voltar a usar.
+          proibidas = ['/functions/v1/search', '/functions/v1/resolve-address', '/functions/v1/routing', "'save_favorite'"]
+          usadas = [x for x in proibidas if re.search(re.escape(x) + r"(?![A-Za-z0-9_-])", html)]
+          if usadas:
+              raise SystemExit(f"Endpoints desligados ainda usados: {usadas}")
+          for nome in ["index.html", "sw.js", "environment.example"]:
+              if "SERVICE_ROLE" in Path(nome).read_text(encoding="utf-8"):
+                  raise SystemExit(f"{nome} menciona a service role key")
+          # Os buckets das fotos são privados: nada de links "public" para eles.
+          publicos = re.findall(r"storage/v1/object/public/(field-photos|kyc-artifacts|chat-media|delivery-proofs)", html)
+          if publicos:
+              raise SystemExit(f"Links públicos para buckets privados: {sorted(set(publicos))}")
+
           scripts = re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>', html, flags=re.I|re.S)
           for i, script in enumerate(scripts, 1):
               if not script.strip():
@@ -43,3 +57,17 @@ jobs:
               subprocess.run(["node", "--check", path], check=True)
           print(f"Validated {len(scripts)} inline script block(s).")
           PY
+
+  browser-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Instalar o Playwright (Chromium)
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Testes do site num navegador (Supabase simulado)
+        run: node tests/smoke.mjs
