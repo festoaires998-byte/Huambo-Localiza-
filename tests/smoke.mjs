@@ -219,6 +219,22 @@ await teste('verificação simples: depois de enviar diz "em revisão", nunca "V
   await context.close();
 });
 
+await teste('política de privacidade: página abre e o ecrã de entrada liga para ela', async () => {
+  const { page, context } = await abrir();
+  assert.equal(await page.getAttribute('#link-privacidade', 'href'), 'privacidade.html');
+  const p = await context.newPage();
+  const erros = [];
+  p.on('pageerror', (e) => erros.push(String(e)));
+  await p.goto(BASE + 'privacidade.html');
+  assert.equal(await p.title(), 'Política de privacidade — Angola Localiza');
+  const texto = await p.textContent('main');
+  for (const parte of ['Que dados recolhemos', 'Com quem partilhamos', 'Durante quanto tempo', 'Os teus direitos', 'Apagar a conta', 'segundo plano']) {
+    assert.ok(texto.includes(parte), `falta: ${parte}`);
+  }
+  assert.deepEqual(erros, []);
+  await context.close();
+});
+
 await browser.close();
 servidor.close();
 if (falhas) { console.error(`${falhas} teste(s) falharam`); process.exit(1); }
