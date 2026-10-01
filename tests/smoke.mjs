@@ -50,6 +50,12 @@ async function abrir(query = '') {
     if (u.pathname.endsWith('/functions/v1/pesquisa')) {
       return json({ tipo: 'texto', resultados: [{ tipo: 'morada', id: 'm1', titulo: MAU, subtitulo: 'Rua X', latitude: null, longitude: null, codigo_postal: 'X', plus_code: null }] });
     }
+    if (u.pathname.endsWith('/functions/v1/citizen-verify') && u.searchParams.get('action') === 'submit') {
+      return json({ ok: true, status: 'PENDING_REVIEW' });
+    }
+    if (u.pathname.endsWith('/functions/v1/citizen-verify') && u.searchParams.get('action') === 'status') {
+      return json({ citizen_id_verified: false, citizen_id_status: 'PENDING_REVIEW' });
+    }
     if (u.pathname.startsWith('/storage/v1/object/')) return json(respostaStorage.body, respostaStorage.status);
     if (u.pathname.endsWith('/functions/v1/signing-keys')) return json({ ok: true });
     if (u.pathname.endsWith('/functions/v1/sync')) {
@@ -193,6 +199,23 @@ await teste('pesquisa usa a função pesquisa e escapa o resultado', async () =>
   const p = pedidos.filter((x) => x.url.endsWith('/functions/v1/pesquisa')).pop();
   assert.deepEqual(JSON.parse(p.corpo), { query: 'Rua X' });
   assert.ok(!pedidos.some((x) => /functions\/v1\/(search|resolve-address|routing)(\?|$)/.test(x.url)));
+  await context.close();
+});
+
+await teste('verificação simples: depois de enviar diz "em revisão", nunca "Verificado!"', async () => {
+  const { page, context } = await abrir();
+  await page.evaluate((t) => {
+    window.session = { access_token: t, email: 't@exemplo.ao' };
+    session = window.session;
+    myRoles = [];
+    cidadaoVerifUrls.frente = 'u/f.jpg'; cidadaoVerifUrls.verso = 'u/v.jpg'; cidadaoVerifUrls.selfie = 'u/s.jpg';
+    const b = document.getElementById('btn-cidadao-verif-enviar');
+    b.disabled = false; b.click();
+  }, TOKEN);
+  await page.waitForFunction(() => document.getElementById('cidadao-verif-status').textContent.includes('Em revisão'), null, { timeout: 5000 });
+  const msg = await page.evaluate(() => document.getElementById('cidadao-verif-msg').textContent);
+  assert.match(msg, /Fica em revisão/);
+  assert.doesNotMatch(msg, /Verificado/);
   await context.close();
 });
 
