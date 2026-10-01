@@ -29,6 +29,8 @@ const BASE = `http://127.0.0.1:${servidor.address().port}/`;
 const browser = await chromium.launch(process.env.PLAYWRIGHT_BROWSERS_PATH ? {} : {});
 const pedidos = [];
 let respostaStorage = { status: 200, body: { Key: 'ok' } };
+let respostaMudarPais = null;
+let estadoMotorista = { application: null, profile: null };
 
 async function abrir(query = '') {
   const context = await browser.newContext({ serviceWorkers: 'block' });
@@ -56,6 +58,15 @@ async function abrir(query = '') {
     if (u.pathname.endsWith('/functions/v1/citizen-verify') && u.searchParams.get('action') === 'status') {
       return json({ citizen_id_verified: false, citizen_id_status: 'PENDING_REVIEW' });
     }
+    if (u.pathname.endsWith('/functions/v1/apagar-conta')) {
+      return JSON.parse(corpo).confirmacao.trim().toUpperCase() === 'APAGAR' ? json({ ok: true }) : json({ error: 'CONFIRMACAO_EM_FALTA' }, 400);
+    }
+    if (u.pathname.endsWith('/rest/v1/user_country_profiles')) return json([{ country_code: 'AO' }]);
+    if (u.pathname.endsWith('/rest/v1/rpc/mudar_pais_da_conta')) {
+      return respostaMudarPais ? json(respostaMudarPais.body, respostaMudarPais.status) : json(JSON.parse(corpo).p_pais);
+    }
+    if (u.pathname.endsWith('/functions/v1/driver-kyc') && u.searchParams.get('action') === 'status') return json(estadoMotorista);
+    if (u.pathname.endsWith('/functions/v1/driver-kyc') && u.searchParams.get('action') === 'set_online') return json({ ok: true, online: JSON.parse(corpo).online });
     if (u.pathname.startsWith('/storage/v1/object/')) return json(respostaStorage.body, respostaStorage.status);
     if (u.pathname.endsWith('/functions/v1/signing-keys')) return json({ ok: true });
     if (u.pathname.endsWith('/functions/v1/sync')) {
@@ -216,6 +227,145 @@ await teste('verificação simples: depois de enviar diz "em revisão", nunca "V
   const msg = await page.evaluate(() => document.getElementById('cidadao-verif-msg').textContent);
   assert.match(msg, /Fica em revisão/);
   assert.doesNotMatch(msg, /Verificado/);
+  await context.close();
+});
+
+await teste('política de privacidade: página abre e o ecrã de entrada liga para ela', async () => {
+  const { page, context } = await abrir();
+  assert.equal(await page.getAttribute('#link-privacidade', 'href'), 'privacidade.html');
+  const p = await context.newPage();
+  const erros = [];
+  p.on('pageerror', (e) => erros.push(String(e)));
+  await p.goto(BASE + 'privacidade.html');
+  assert.equal(await p.title(), 'Política de privacidade — Angola Localiza');
+  const texto = await p.textContent('main');
+  for (const parte of ['Que dados recolhemos', 'Com quem partilhamos', 'Durante quanto tempo', 'Os teus direitos', 'Apagar a conta', 'Conta → Apagar a minha conta', 'segundo plano']) {
+    assert.ok(texto.includes(parte), `falta: ${parte}`);
+  }
+  assert.deepEqual(erros, []);
+  await context.close();
+});
+
+await teste('apagar a conta: só com APAGAR; depois sai, limpa a fila deste navegador e avisa', async () => {
+  const { page, context } = await abrir();
+  await page.evaluate(({ t, uid }) => {
+    window.session = { access_token: t, email: 't@exemplo.ao' };
+    session = window.session;
+    localStorage.setItem('al_pending_op_x', JSON.stringify({ operation_id: 'x', owner_user_id: uid, operation_type: 'create_favorite', payload: {} }));
+    localStorage.setItem('al_pending_op_y', JSON.stringify({ operation_id: 'y', owner_user_id: 'outra-pessoa', operation_type: 'create_favorite', payload: {} }));
+  }, { t: TOKEN, uid: UID });
+  const escrever = (texto) => page.evaluate((t) => {
+    const campo = document.getElementById('apagar-conta-confirmacao');
+    campo.value = t; campo.dispatchEvent(new Event('input'));
+    return document.getElementById('btn-apagar-conta').disabled;
+  }, texto);
+  assert.equal(await page.evaluate(() => document.getElementById('btn-apagar-conta').disabled), true);
+  assert.equal(await escrever('apaga'), true);
+  assert.equal(await escrever('apagar'), false);
+  const antes = pedidos.length;
+  await page.evaluate(() => document.getElementById('btn-apagar-conta').click());
+  await page.waitForFunction(() => document.getElementById('auth-msg').textContent.includes('foi apagada'), null, { timeout: 5000 });
+  const pedido = pedidos.slice(antes).find((p) => p.url.includes('/functions/v1/apagar-conta'));
+  assert.deepEqual(JSON.parse(pedido.corpo), { confirmacao: 'apagar' });
+  assert.equal(await page.evaluate(() => localStorage.getItem('al_pending_op_x')), null);
+  assert.ok(await page.evaluate(() => localStorage.getItem('al_pending_op_y')), 'a fila de outra pessoa fica');
+  assert.equal(await page.evaluate(() => session), null);
+  await context.close();
+});
+
+
+// Abre o separador Conta com uma sessão e estes cargos.
+async function abrirConta(cargos) {
+  const aberto = await abrir();
+  await aberto.page.evaluate(({ t, cargos }) => {
+    window.session = { access_token: t, email: 't@exemplo.ao' };
+    session = window.session;
+    myRoles = cargos;
+    contaCarregar(); cidadaoLoadStatus();
+  }, { t: TOKEN, cargos });
+  await aberto.page.waitForFunction(() => document.getElementById('pais-conta-valor').textContent === '🇦🇴 Angola', null, { timeout: 5000 });
+  return aberto;
+}
+const seccoesVisiveis = (page) => page.evaluate(() => [...document.querySelectorAll('#panel-definicoes .conta-sub')]
+  .filter((el) => el.closest('.card').style.display !== 'none').map((el) => el.textContent));
+
+await teste('Conta: as mesmas secções e a mesma ordem da app', async () => {
+  const { page, erros, context } = await abrirConta([]);
+  assert.equal((await page.textContent('#tab-btn-definicoes')).trim(), '👤Conta');
+  assert.deepEqual(await seccoesVisiveis(page), ['A tua conta', 'País da conta', 'Motorista', 'Verificação simples', 'Notificações', 'Sincronização', 'Neste navegador', 'Ajuda', 'Apagar a minha conta']);
+  assert.equal(await page.textContent('#conta-email'), 't@exemplo.ao');
+  assert.equal(await page.textContent('#conta-cargos'), 'Cidadão');
+  assert.equal(await page.textContent('#btn-logout'), 'Sair');
+  assert.equal(await page.getAttribute('#link-privacidade-conta', 'href'), 'privacidade.html');
+  await page.waitForFunction(() => /^Angola Localiza, versão \d{4}-\d{2}-\d{2}$/.test(document.getElementById('conta-versao').textContent), null, { timeout: 5000 });
+  assert.deepEqual(erros, []);
+  await context.close();
+});
+
+await teste('Conta: o pessoal vê a identidade e os dois passos, não a verificação simples nem "Mudar de país"', async () => {
+  const { page, context } = await abrirConta(['tecnico_campo']);
+  assert.deepEqual(await seccoesVisiveis(page), ['A tua conta', 'País da conta', 'Motorista', 'Verificação de identidade', 'Verificação em dois passos', 'Notificações', 'Sincronização', 'Neste navegador', 'Ajuda', 'Apagar a minha conta']);
+  assert.equal(await page.textContent('#conta-cargos'), 'Técnico de campo');
+  assert.equal(await page.evaluate(() => document.getElementById('btn-mudar-pais').style.display), 'none');
+  assert.match(await page.textContent('#pais-conta-pessoal'), /pede a um administrador/);
+  await context.close();
+});
+
+await teste('país da conta: só muda depois do aviso e grava no servidor', async () => {
+  respostaMudarPais = null;
+  const { page, context } = await abrirConta([]);
+  const clicar = (sel) => page.evaluate((s) => document.querySelector(s).click(), sel);
+  const pedidosPais = () => pedidos.filter((p) => p.url.includes('/rpc/mudar_pais_da_conta'));
+  const antes = pedidosPais().length;
+  await clicar('#btn-mudar-pais');
+  const opcoes = await page.evaluate(() => [...document.querySelectorAll('#pais-conta-opcoes button')].map((b) => b.textContent));
+  assert.deepEqual(opcoes, ['🇲🇿 Moçambique', '🇨🇻 Cabo Verde', '🇬🇼 Guiné-Bissau', '🇸🇹 São Tomé e Príncipe']);
+  await clicar('#pais-conta-opcoes button[data-pais="MZ"]');
+  assert.equal(await page.textContent('#pais-conta-pergunta'), 'Mudar para 🇲🇿 Moçambique?');
+  assert.match(await page.textContent('#pais-conta-aviso'), /As moradas que já guardaste não mudam/);
+  await clicar('#btn-pais-cancelar');
+  assert.equal(pedidosPais().length, antes, 'cancelar não pede nada');
+  await clicar('#btn-mudar-pais');
+  await clicar('#pais-conta-opcoes button[data-pais="MZ"]');
+  assert.equal(await page.textContent('#btn-pais-confirmar'), 'Sim, mudar para Moçambique');
+  await clicar('#btn-pais-confirmar');
+  await page.waitForFunction(() => document.getElementById('pais-conta-msg').textContent === 'País da conta mudado para Moçambique.', null, { timeout: 5000 });
+  assert.deepEqual(JSON.parse(pedidosPais().pop().corpo), { p_pais: 'MZ' });
+  assert.equal(await page.textContent('#pais-conta-valor'), '🇲🇿 Moçambique');
+  assert.match(await page.textContent('#session-label'), /^MZ · /);
+  await context.close();
+});
+
+await teste('país da conta: se o servidor recusar, mostra o erro e o país fica', async () => {
+  respostaMudarPais = { status: 400, body: { message: 'MUDAR_PAIS_MOTORISTA: os motoristas pedem a um administrador' } };
+  const { page, context } = await abrirConta([]);
+  await page.evaluate(() => { document.getElementById('btn-mudar-pais').click(); document.querySelector('#pais-conta-opcoes button[data-pais="CV"]').click(); document.getElementById('btn-pais-confirmar').click(); });
+  await page.waitForFunction(() => /És motorista/.test(document.getElementById('pais-conta-msg').textContent), null, { timeout: 5000 });
+  assert.equal(await page.textContent('#pais-conta-valor'), '🇦🇴 Angola');
+  respostaMudarPais = null;
+  await context.close();
+});
+
+await teste('motorista: candidatura recusada mostra o motivo e o formulário; aprovada mostra a disponibilidade', async () => {
+  estadoMotorista = { application: { status: 'REJECTED', rejection_reason: 'Carta ilegível', country_code: 'AO' }, profile: null };
+  const { page, context } = await abrirConta([]);
+  await page.evaluate(() => document.getElementById('btn-motorista-abrir').click());
+  await page.waitForFunction(() => /Carta ilegível/.test(document.getElementById('motorista-estado').textContent), null, { timeout: 5000 });
+  assert.equal(await page.evaluate(() => document.getElementById('motorista-form').style.display), 'block');
+  assert.equal(await page.locator('#motorista-docs input[type=file]').count(), 5);
+  await page.evaluate(() => document.getElementById('btn-motorista-enviar').click());
+  assert.equal(await page.textContent('#motorista-msg'), 'Faltam documentos/fotografias obrigatórios.');
+
+  estadoMotorista = { application: { status: 'APPROVED', country_code: 'AO' }, profile: { online: false } };
+  await page.evaluate(() => motoristaCarregar());
+  await page.waitForFunction(() => document.getElementById('btn-motorista-disponivel').style.display === 'block', null, { timeout: 5000 });
+  assert.equal(await page.textContent('#btn-motorista-disponivel'), 'Ficar disponível');
+  assert.equal(await page.evaluate(() => document.getElementById('motorista-form').style.display), 'none');
+  await page.evaluate(() => document.getElementById('btn-motorista-disponivel').click());
+  await page.waitForFunction(() => /Estás disponível/.test(document.getElementById('motorista-msg').textContent), null, { timeout: 5000 });
+  const p = pedidos.filter((x) => x.url.includes('driver-kyc?action=set_online')).pop();
+  assert.deepEqual(JSON.parse(p.corpo), { online: true });
+  estadoMotorista = { application: null, profile: null };
   await context.close();
 });
 

@@ -196,6 +196,13 @@
   }
   .segmented button.active { background: var(--accent); color: #FBF6EE; }
 
+  .conta-sub { font-size: 16px; font-weight: 700; margin: 0; }
+  #panel-definicoes .card .msg { text-align: left; }
+  #panel-definicoes .msg:empty { display: none; }
+  .conta-linha { display: flex; justify-content: space-between; gap: var(--sp-3); font-size: 14px; }
+  .conta-linha span { color: var(--text-dim); }
+  .conta-linha b { text-align: right; overflow-wrap: anywhere; }
+  .conta-aviso { border: 1px solid var(--accent); border-radius: var(--radius-md); padding: var(--sp-3); }
   .card { background: var(--surface-2); border-radius: var(--radius-md); padding: var(--sp-4); border: 1px solid var(--border); box-shadow: var(--shadow-card); }
   .card-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
   .divider { height: 1px; background: var(--border); margin: var(--sp-4) 0; }
@@ -382,6 +389,7 @@ var APP_BUILD_ID = "20260930-sintonia-app";
       </div>
       <button id="btn-submit" class="btn btn-primary" style="margin-top: var(--sp-4);">Entrar</button>
       <p id="auth-msg" class="msg" style="margin-top: var(--sp-3);"></p>
+      <p style="margin-top: var(--sp-3); text-align:center;"><a id="link-privacidade" href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>
       <p style="text-align:center;margin-top:var(--sp-3);">
         <a id="link-esqueci-password" href="#" style="color:var(--text-dim);font-size:12.5px;text-decoration:underline;">Esqueci-me da password</a>
       </p>
@@ -459,7 +467,7 @@ var APP_BUILD_ID = "20260930-sintonia-app";
     <div id="panel-mapa" class="panel visible">
       <div id="nav-kyc-pending-banner" style="display:none;background:var(--surface-2);border:1px solid var(--danger);border-radius:10px;padding:12px 14px;margin-bottom:var(--sp-4);">
         <div style="color:var(--danger);font-weight:700;">🔒 Identidade em revisão (até 24h)</div>
-        <div style="font-size:12px;color:var(--text-dim);margin-top:4px;">Enquanto a tua identidade não for aprovada, só consegues usar o Mapa e as Definições. As restantes secções aparecem assim que fores verificado.</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:4px;">Enquanto a tua identidade não for aprovada, só consegues usar o Mapa e a Conta. As restantes secções aparecem assim que fores verificado.</div>
       </div>
       <p class="lead">Mapa e GPS reais · Código Postal Digital gerado ao vivo</p>
 
@@ -1290,74 +1298,58 @@ Erros: 400 validação · 401 chave inválida · 403 escopo insuficiente · 404 
     </div>
 
     <div id="panel-definicoes" class="panel">
+      <!-- As mesmas secções e a mesma ordem da app (separador Conta). -->
       <div class="stack">
-        <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);">
-          <div>
-            <div class="value-plain">☀️ Tema claro</div>
-            <div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">Mais legível ao sol forte, no terreno</div>
+        <div class="card stack-sm">
+          <p class="conta-sub">A tua conta</p>
+          <div class="conta-linha"><span>Email</span><b id="conta-email">—</b></div>
+          <div class="conta-linha"><span id="conta-cargos-rotulo">Cargo</span><b id="conta-cargos">Cidadão</b></div>
+          <div class="conta-linha" id="conta-identidade-linha" style="display:none;"><span>Identidade</span><b id="conta-identidade">—</b></div>
+        </div>
+
+        <div class="card stack-sm" id="pais-conta-box">
+          <p class="conta-sub">País da conta</p>
+          <div class="conta-linha"><span>País</span><b id="pais-conta-valor">🇦🇴 Angola</b></div>
+          <p id="pais-conta-pessoal" class="msg msg-muted" style="display:none;margin:0;">Tens um cargo na plataforma: para mudar de país, pede a um administrador.</p>
+          <button id="btn-mudar-pais" class="btn btn-secondary">Mudar de país</button>
+          <div id="pais-conta-lista" class="stack-sm" style="display:none;">
+            <p class="msg msg-muted" style="margin:0;">Escolhe o país onde vais usar o Localiza.</p>
+            <div id="pais-conta-opcoes" class="stack-sm"></div>
+            <button id="btn-pais-cancelar-lista" class="btn btn-secondary">Cancelar</button>
           </div>
-          <label class="switch">
-            <input type="checkbox" id="theme-toggle" />
-            <span class="track"><span class="thumb"></span></span>
-          </label>
-        </div>
-        <div>
-          <p class="lead" style="margin-bottom:var(--sp-3);">Notificações</p>
-          <div id="notifications-list" class="stack-sm"></div>
-          <div id="notifications-empty" class="empty-state" style="display:none;"><div class="desc" style="margin:0;">Sem notificações.</div></div>
-        </div>
-
-        <div id="cidadao-verificacao-box" style="display:none;">
-          <p class="lead" style="margin-bottom:var(--sp-3);">Verificação simples (para registares casas, lojas, escolas...)</p>
-          <p id="cidadao-verif-status" class="msg msg-muted"></p>
-          <div id="cidadao-verif-form" style="display:none;">
-            <p style="font-size:11.5px;color:var(--text-dim);margin:0 0 var(--sp-3);">
-              Três fotos, todas pela câmara (nunca da galeria), com marca de água de localização e data/hora.
-            </p>
-
-            <div class="field">
-              <label>Foto do BI — frente</label>
-              <video id="cidadao-bi-frente-video" autoplay playsinline muted style="width:100%;border-radius:10px;background:#000;"></video>
-              <canvas id="cidadao-bi-frente-canvas" style="display:none;"></canvas>
-              <div class="btn-row" style="margin-top:6px;">
-                <button id="btn-cidadao-bi-frente-abrir" class="btn btn-secondary btn-sm">📷 Abrir câmara</button>
-                <button id="btn-cidadao-bi-frente-capturar" class="btn btn-primary btn-sm" style="display:none;">Capturar</button>
-              </div>
-              <img id="cidadao-bi-frente-preview" style="display:none;width:100%;border-radius:10px;margin-top:6px;" />
-              <p id="cidadao-bi-frente-status" class="msg" style="margin-top:4px;"></p>
-            </div>
-
-            <div class="field">
-              <label>Foto do BI — verso</label>
-              <video id="cidadao-bi-verso-video" autoplay playsinline muted style="width:100%;border-radius:10px;background:#000;"></video>
-              <canvas id="cidadao-bi-verso-canvas" style="display:none;"></canvas>
-              <div class="btn-row" style="margin-top:6px;">
-                <button id="btn-cidadao-bi-verso-abrir" class="btn btn-secondary btn-sm">📷 Abrir câmara</button>
-                <button id="btn-cidadao-bi-verso-capturar" class="btn btn-primary btn-sm" style="display:none;">Capturar</button>
-              </div>
-              <img id="cidadao-bi-verso-preview" style="display:none;width:100%;border-radius:10px;margin-top:6px;" />
-              <p id="cidadao-bi-verso-status" class="msg" style="margin-top:4px;"></p>
-            </div>
-
-            <div class="field">
-              <label>Selfie (rosto virado para a câmara)</label>
-              <video id="cidadao-selfie-video" autoplay playsinline muted style="width:100%;border-radius:10px;background:#000;"></video>
-              <canvas id="cidadao-selfie-canvas" style="display:none;"></canvas>
-              <div class="btn-row" style="margin-top:6px;">
-                <button id="btn-cidadao-selfie-abrir" class="btn btn-secondary btn-sm">🤳 Abrir câmara frontal</button>
-                <button id="btn-cidadao-selfie-capturar" class="btn btn-primary btn-sm" style="display:none;">Capturar</button>
-              </div>
-              <img id="cidadao-selfie-preview" style="display:none;width:100%;border-radius:10px;margin-top:6px;" />
-              <p id="cidadao-selfie-status" class="msg" style="margin-top:4px;"></p>
-            </div>
-
-            <button id="btn-cidadao-verif-enviar" class="btn btn-primary" disabled>Confirmar verificação</button>
+          <div id="pais-conta-confirmar" class="conta-aviso stack-sm" style="display:none;">
+            <div id="pais-conta-pergunta" class="value-plain"></div>
+            <p id="pais-conta-aviso" style="margin:0;font-size:13px;"></p>
+            <button id="btn-pais-confirmar" class="btn btn-primary"></button>
+            <button id="btn-pais-cancelar" class="btn btn-secondary">Cancelar</button>
           </div>
-          <p id="cidadao-verif-msg" class="msg" style="margin-top:var(--sp-2);"></p>
+          <p id="pais-conta-msg" class="msg" style="margin:0;"></p>
         </div>
 
-        <div>
-          <p class="lead" style="margin-bottom:var(--sp-3);">Verificação de identidade (Staff KYC)</p>
+        <div class="card stack-sm" id="motorista-box">
+          <p class="conta-sub">Motorista</p>
+          <p class="msg msg-muted" style="margin:0;">Candidata-te para trabalhar como motorista. A documentação é revista antes de ativares o perfil.</p>
+          <button id="btn-motorista-abrir" class="btn btn-secondary">Motorista / KYC</button>
+          <div id="motorista-conteudo" class="stack-sm" style="display:none;">
+            <p id="motorista-estado" class="msg msg-muted" style="margin:0;"></p>
+            <button id="btn-motorista-disponivel" class="btn btn-primary" style="display:none;"></button>
+            <div id="motorista-form" class="stack-sm" style="display:none;">
+              <div class="field"><label for="motorista-veiculo">Tipo de veículo</label><input id="motorista-veiculo" class="input" type="text" placeholder="Moto, carro, carrinha…" /></div>
+              <div class="field"><label for="motorista-matricula">Matrícula</label><input id="motorista-matricula" class="input" type="text" placeholder="Matrícula" /></div>
+              <div class="field"><label for="motorista-carta">Número da carta</label><input id="motorista-carta" class="input" type="text" placeholder="Número da carta de condução" /></div>
+              <div class="field"><label for="motorista-validade">Validade da carta (AAAA-MM-DD)</label><input id="motorista-validade" class="input" type="text" placeholder="AAAA-MM-DD" /></div>
+              <div class="field"><label for="motorista-capacidade">Capacidade de carga (kg)</label><input id="motorista-capacidade" class="input" type="text" inputmode="decimal" placeholder="Ex.: 40" /></div>
+              <div id="motorista-docs" class="stack-sm"></div>
+              <button id="btn-motorista-enviar" class="btn btn-primary">Enviar candidatura a Motorista</button>
+              <p class="msg msg-muted" style="margin:0;font-size:11.5px;">Os documentos ficam no bucket privado de KYC. A aprovação e o estado operacional são controlados pelo servidor.</p>
+            </div>
+            <p id="motorista-msg" class="msg" style="margin:0;"></p>
+          </div>
+        </div>
+
+        <div class="card stack-sm" id="kyc-box" style="display:none;">
+          <p class="conta-sub">Verificação de identidade</p>
+          <p class="msg msg-muted" style="margin:0;">Obrigatória para o pessoal (técnicos, estafetas, supervisores…): fotos do BI e um vídeo curto, revistos por uma pessoa.</p>
           <p id="kyc-status" class="msg msg-muted"></p>
           <p id="kyc-protocolo" class="msg msg-muted" style="font-size:11px;"></p>
 
@@ -1431,8 +1423,9 @@ Erros: 400 validação · 401 chave inválida · 403 escopo insuficiente · 404 
           <p id="kyc-msg" class="msg" style="margin-top:6px;"></p>
         </div>
 
-        <div>
-          <p class="lead" style="margin-bottom:var(--sp-3);">Verificação em dois passos (obrigatório para cargos de equipa L2+)</p>
+        <div class="card stack-sm" id="mfa-box" style="display:none;">
+          <p class="conta-sub">Verificação em dois passos</p>
+          <p class="msg msg-muted" style="margin:0;">Obrigatória para o pessoal com cargo.</p>
           <div id="mfa-not-enrolled">
             <button id="btn-mfa-start" class="btn btn-secondary">🔒 Ativar verificação em dois passos</button>
           </div>
@@ -1446,15 +1439,101 @@ Erros: 400 validação · 401 chave inválida · 403 escopo insuficiente · 404 
           <p id="mfa-msg" class="msg"></p>
         </div>
 
-        <div>
-          <p class="lead" style="margin-bottom:var(--sp-3);">Modo offline</p>
-          <p id="offline-status" class="msg msg-muted" style="margin:0 0 var(--sp-2);">A verificar...</p>
-          <button id="btn-sync-pending" class="btn btn-secondary" style="display:none;">🔄 Sincronizar agora</button>
+        <div class="card stack-sm" id="cidadao-verificacao-box" style="display:none;">
+          <p class="conta-sub">Verificação simples</p>
+          <p class="msg msg-muted" style="margin:0;">Obrigatória para registares moradas: fotos do BI e uma selfie.</p>
+          <p id="cidadao-verif-status" class="msg msg-muted"></p>
+          <div id="cidadao-verif-form" style="display:none;">
+            <p style="font-size:11.5px;color:var(--text-dim);margin:0 0 var(--sp-3);">
+              Três fotos, todas pela câmara (nunca da galeria), com marca de água de localização e data/hora.
+            </p>
+
+            <div class="field">
+              <label>Foto do BI — frente</label>
+              <video id="cidadao-bi-frente-video" autoplay playsinline muted style="width:100%;border-radius:10px;background:#000;"></video>
+              <canvas id="cidadao-bi-frente-canvas" style="display:none;"></canvas>
+              <div class="btn-row" style="margin-top:6px;">
+                <button id="btn-cidadao-bi-frente-abrir" class="btn btn-secondary btn-sm">📷 Abrir câmara</button>
+                <button id="btn-cidadao-bi-frente-capturar" class="btn btn-primary btn-sm" style="display:none;">Capturar</button>
+              </div>
+              <img id="cidadao-bi-frente-preview" style="display:none;width:100%;border-radius:10px;margin-top:6px;" />
+              <p id="cidadao-bi-frente-status" class="msg" style="margin-top:4px;"></p>
+            </div>
+
+            <div class="field">
+              <label>Foto do BI — verso</label>
+              <video id="cidadao-bi-verso-video" autoplay playsinline muted style="width:100%;border-radius:10px;background:#000;"></video>
+              <canvas id="cidadao-bi-verso-canvas" style="display:none;"></canvas>
+              <div class="btn-row" style="margin-top:6px;">
+                <button id="btn-cidadao-bi-verso-abrir" class="btn btn-secondary btn-sm">📷 Abrir câmara</button>
+                <button id="btn-cidadao-bi-verso-capturar" class="btn btn-primary btn-sm" style="display:none;">Capturar</button>
+              </div>
+              <img id="cidadao-bi-verso-preview" style="display:none;width:100%;border-radius:10px;margin-top:6px;" />
+              <p id="cidadao-bi-verso-status" class="msg" style="margin-top:4px;"></p>
+            </div>
+
+            <div class="field">
+              <label>Selfie (rosto virado para a câmara)</label>
+              <video id="cidadao-selfie-video" autoplay playsinline muted style="width:100%;border-radius:10px;background:#000;"></video>
+              <canvas id="cidadao-selfie-canvas" style="display:none;"></canvas>
+              <div class="btn-row" style="margin-top:6px;">
+                <button id="btn-cidadao-selfie-abrir" class="btn btn-secondary btn-sm">🤳 Abrir câmara frontal</button>
+                <button id="btn-cidadao-selfie-capturar" class="btn btn-primary btn-sm" style="display:none;">Capturar</button>
+              </div>
+              <img id="cidadao-selfie-preview" style="display:none;width:100%;border-radius:10px;margin-top:6px;" />
+              <p id="cidadao-selfie-status" class="msg" style="margin-top:4px;"></p>
+            </div>
+
+            <button id="btn-cidadao-verif-enviar" class="btn btn-primary" disabled>Confirmar verificação</button>
+          </div>
+          <p id="cidadao-verif-msg" class="msg" style="margin-top:var(--sp-2);"></p>
         </div>
 
-        <button id="btn-apagar-historico" class="btn btn-secondary">🗑️ Apagar histórico de pesquisas</button>
-        <p id="definicoes-msg" class="msg"></p>
-        <button id="btn-logout" class="btn btn-danger-outline">Terminar sessão</button>
+        <div class="card stack-sm">
+          <p class="conta-sub">Notificações</p>
+          <p class="msg msg-muted" style="margin:0;">Vê avisos de entregas, validações, Campo e outros eventos da tua conta.</p>
+          <div id="notifications-list" class="stack-sm"></div>
+          <div id="notifications-empty" class="empty-state" style="display:none;"><div class="desc" style="margin:0;">Sem notificações.</div></div>
+        </div>
+
+        <div class="card stack-sm">
+          <p class="conta-sub">Sincronização</p>
+          <p id="offline-status" class="msg msg-muted" style="margin:0;">A verificar...</p>
+          <button id="btn-sync-pending" class="btn btn-primary" style="display:none;">Sincronizar agora</button>
+        </div>
+
+        <div class="card stack-sm">
+          <p class="conta-sub">Neste navegador</p>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);">
+            <div>
+              <div class="value-plain">☀️ Tema claro</div>
+              <div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">Mais legível ao sol forte, no terreno</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="theme-toggle" />
+              <span class="track"><span class="thumb"></span></span>
+            </label>
+          </div>
+          <button id="btn-apagar-historico" class="btn btn-secondary">🗑️ Apagar histórico de pesquisas</button>
+          <p id="definicoes-msg" class="msg" style="margin:0;"></p>
+        </div>
+
+        <div class="card stack-sm">
+          <p class="conta-sub">Ajuda</p>
+          <a id="link-privacidade-conta" class="btn btn-secondary" href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>
+        </div>
+
+        <button id="btn-logout" class="btn btn-danger-outline">Sair</button>
+
+        <div id="apagar-conta-box" class="card stack-sm">
+          <p class="conta-sub">Apagar a minha conta</p>
+          <p class="msg msg-muted" style="margin:0;">Apaga o teu nome, email e telefone, as fotos do BI e a selfie, os favoritos, as notificações e as moradas privadas. As entregas e as provas ficam, sem o teu nome. Não tem volta atrás.</p>
+          <input id="apagar-conta-confirmacao" class="input" type="text" placeholder="Escreve APAGAR para confirmar" autocomplete="off" aria-label="Escreve APAGAR para confirmar" />
+          <button id="btn-apagar-conta" class="btn btn-danger-outline" disabled>Apagar a minha conta</button>
+          <p id="apagar-conta-msg" class="msg" style="margin:0;"></p>
+        </div>
+
+        <p id="conta-versao" class="msg msg-muted" style="text-align:center;margin:0;">Angola Localiza</p>
       </div>
     </div>
 
@@ -1466,7 +1545,7 @@ Erros: 400 validação · 401 chave inválida · 403 escopo insuficiente · 404 
       <button id="tab-btn-campo" class="tab-btn al-tab" data-tab="campo" style="display:none;"><span class="ic">🧭</span>Campo</button>
       <button id="tab-btn-validar" class="tab-btn al-tab" data-tab="validar" style="display:none;"><span class="ic">✅</span>Validar</button>
       <button id="tab-btn-admin" class="tab-btn al-tab" data-tab="admin" style="display:none;"><span class="ic">🛡️</span>Admin</button>
-      <button id="tab-btn-definicoes" class="tab-btn al-tab" data-tab="definicoes"><span class="ic">⚙️</span>Definições</button>
+      <button id="tab-btn-definicoes" class="tab-btn al-tab" data-tab="definicoes"><span class="ic">👤</span>Conta</button>
     </div>
   </div>
 </div>
@@ -3198,6 +3277,270 @@ document.getElementById('btn-apagar-historico').addEventListener('click', functi
   }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
 });
 
+// ---- Apagar a minha conta (função apagar-conta; o servidor confirma a palavra outra vez) ----
+document.getElementById('apagar-conta-confirmacao').addEventListener('input', function(ev) {
+  document.getElementById('btn-apagar-conta').disabled = ev.target.value.trim().toUpperCase() !== 'APAGAR';
+});
+document.getElementById('btn-apagar-conta').addEventListener('click', function() {
+  var btn = document.getElementById('btn-apagar-conta');
+  var msg = document.getElementById('apagar-conta-msg');
+  var confirmacao = document.getElementById('apagar-conta-confirmacao').value;
+  btn.disabled = true;
+  msg.className = 'msg msg-muted'; msg.textContent = 'A apagar a conta...';
+  fetch(SUPABASE_URL + '/functions/v1/apagar-conta?action=apagar', {
+    method: 'POST', headers: cabecalhosFuncao(), body: JSON.stringify({ confirmacao: confirmacao })
+  }).then(function(r) { return r.json().catch(function() { return {}; }).then(function(d) { return { ok: r.ok, d: d }; }); })
+    .then(function(res) {
+      if (!res.ok) {
+        var erro = String(res.d && res.d.error || 'erro desconhecido');
+        msg.className = 'msg msg-error';
+        msg.textContent = erro.indexOf('SUPER_ADMIN') === 0
+          ? 'És super administrador: pede a outro super administrador para te tirar o cargo antes de apagares a conta.'
+          : 'Não foi possível apagar a conta (' + erro + ').';
+        btn.disabled = false;
+        return;
+      }
+      // A conta já foi apagada: limpa o que ficou neste navegador e volta ao início.
+      getPendingOps().forEach(function(op) { localStorage.removeItem('al_pending_op_' + op.operation_id); });
+      document.getElementById('btn-logout').click();
+      var authMsg = document.getElementById('auth-msg');
+      authMsg.className = 'msg msg-success'; authMsg.textContent = 'A tua conta foi apagada.';
+    })
+    .catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Sem ligação ao servidor. Tenta outra vez.'; btn.disabled = false; });
+});
+
+// ---- Conta: as mesmas secções da app (conta, país, motorista, verificações...) ----
+var NOMES_CARGOS = {
+  super_admin: 'Super administrador', admin_nacional: 'Administrador nacional', admin_provincial: 'Administrador provincial',
+  admin_municipal: 'Administrador municipal', tecnico_campo: 'Técnico de campo', supervisor: 'Supervisor',
+  operador_postal: 'Operador postal', auditor: 'Auditor', empresa: 'Empresa', estafeta: 'Estafeta'
+};
+var PAISES_CONTA = { AO: ['🇦🇴', 'Angola'], MZ: ['🇲🇿', 'Moçambique'], CV: ['🇨🇻', 'Cabo Verde'], GW: ['🇬🇼', 'Guiné-Bissau'], ST: ['🇸🇹', 'São Tomé e Príncipe'] };
+var contaPais = 'AO';
+var paisParaConfirmar = null;
+
+function nomeDoPais(c) { c = String(c || '').trim().toUpperCase(); return PAISES_CONTA[c] ? PAISES_CONTA[c][1] : c; }
+function paisComBandeira(c) { c = String(c || '').trim().toUpperCase(); return PAISES_CONTA[c] ? PAISES_CONTA[c][0] + ' ' + PAISES_CONTA[c][1] : c; }
+function contaEPessoal() { return myRoles.length > 0; }
+
+function contaMostrarIdentidade(verificada) {
+  var linha = document.getElementById('conta-identidade-linha');
+  if (!contaEPessoal() || myRoles.indexOf('super_admin') > -1) { linha.style.display = 'none'; return; }
+  linha.style.display = 'flex';
+  document.getElementById('conta-identidade').textContent = verificada ? 'Verificada' : 'Ainda não verificada';
+}
+
+function contaMostrarPais(codigo) {
+  contaPais = String(codigo || 'AO').toUpperCase();
+  document.getElementById('pais-conta-valor').textContent = paisComBandeira(contaPais);
+  document.getElementById('session-label').textContent = contaPais + ' · ' + (session ? session.email : '');
+  document.getElementById('conta-versao').textContent = nomeDoPais(contaPais) + ' Localiza' + (contaVersao ? ', versão ' + contaVersao : '');
+}
+
+function contaFecharEscolhaPais() {
+  paisParaConfirmar = null;
+  document.getElementById('pais-conta-lista').style.display = 'none';
+  document.getElementById('pais-conta-confirmar').style.display = 'none';
+  document.getElementById('btn-mudar-pais').style.display = contaEPessoal() ? 'none' : 'block';
+}
+
+var contaVersao = null;
+function contaCarregar() {
+  if (!session) return;
+  var pessoal = contaEPessoal();
+  document.getElementById('conta-email').textContent = session.email || '—';
+  document.getElementById('conta-cargos-rotulo').textContent = myRoles.length > 1 ? 'Cargos' : 'Cargo';
+  document.getElementById('conta-cargos').textContent = pessoal ? myRoles.map(function(r) { return NOMES_CARGOS[r] || r; }).join(', ') : 'Cidadão';
+  // Como na app: verificação de identidade e dois passos só para o pessoal; a simples só para o cidadão.
+  var pessoalComKyc = pessoal && myRoles.indexOf('super_admin') === -1;
+  document.getElementById('kyc-box').style.display = pessoalComKyc ? 'block' : 'none';
+  document.getElementById('mfa-box').style.display = pessoal ? 'block' : 'none';
+  if (pessoalComKyc) kycLoadStatus(); else contaMostrarIdentidade(false);
+  document.getElementById('pais-conta-pessoal').style.display = pessoal ? 'block' : 'none';
+  contaFecharEscolhaPais();
+  fetch(SUPABASE_URL + '/rest/v1/user_country_profiles?select=country_code&limit=1', {
+    headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+  }).then(function(r) { return r.json(); }).then(function(rows) {
+    contaMostrarPais(rows && rows[0] && rows[0].country_code || session.country_code || 'AO');
+  }).catch(function() { contaMostrarPais(contaPais); });
+  if (contaVersao === null) {
+    fetch('version.json', { cache: 'no-store' }).then(function(r) { return r.json(); })
+      .then(function(v) { contaVersao = String(v.updated_at || v.build || ''); contaMostrarPais(contaPais); }).catch(function() {});
+  }
+}
+
+function mensagemErroMudarPais(texto) {
+  texto = String(texto || '');
+  if (texto.indexOf('MUDAR_PAIS_PESSOAL') > -1) return 'Tens um cargo na plataforma: para mudar de país, pede a um administrador.';
+  if (texto.indexOf('MUDAR_PAIS_MOTORISTA') > -1) return 'És motorista (ou tens uma candidatura): para mudar de país, pede a um administrador.';
+  if (texto.indexOf('MUDAR_PAIS_INVALIDO') > -1) return 'Este país ainda não está disponível.';
+  if (texto.indexOf('MUDAR_PAIS_SEM_SESSAO') > -1 || /JWT/i.test(texto)) return 'A tua sessão terminou. Entra outra vez e tenta de novo.';
+  return 'Não foi possível mudar o país (' + texto + '). Tenta outra vez mais tarde.';
+}
+
+document.getElementById('btn-mudar-pais').addEventListener('click', function() {
+  var opcoes = document.getElementById('pais-conta-opcoes');
+  opcoes.innerHTML = '';
+  Object.keys(PAISES_CONTA).filter(function(c) { return c !== contaPais; }).forEach(function(c) {
+    var b = document.createElement('button');
+    b.className = 'btn btn-secondary'; b.textContent = paisComBandeira(c); b.dataset.pais = c;
+    b.addEventListener('click', function() {
+      paisParaConfirmar = c;
+      document.getElementById('pais-conta-lista').style.display = 'none';
+      document.getElementById('pais-conta-pergunta').textContent = 'Mudar para ' + paisComBandeira(c) + '?';
+      document.getElementById('pais-conta-aviso').textContent = 'O mapa, as pesquisas e as moradas novas passam a ser de ' + nomeDoPais(c) + ' (' + nomeDoPais(c) + ' Localiza). As moradas que já guardaste não mudam.';
+      document.getElementById('btn-pais-confirmar').textContent = 'Sim, mudar para ' + nomeDoPais(c);
+      document.getElementById('pais-conta-confirmar').style.display = 'block';
+    });
+    opcoes.appendChild(b);
+  });
+  document.getElementById('pais-conta-msg').textContent = '';
+  document.getElementById('btn-mudar-pais').style.display = 'none';
+  document.getElementById('pais-conta-lista').style.display = 'block';
+});
+document.getElementById('btn-pais-cancelar-lista').addEventListener('click', contaFecharEscolhaPais);
+document.getElementById('btn-pais-cancelar').addEventListener('click', contaFecharEscolhaPais);
+document.getElementById('btn-pais-confirmar').addEventListener('click', function() {
+  var codigo = paisParaConfirmar, btn = this, msg = document.getElementById('pais-conta-msg');
+  if (!codigo || !session) return;
+  if (!navigator.onLine) { msg.className = 'msg msg-error'; msg.textContent = 'Sem internet. Para mudar o país da conta precisas de rede.'; contaFecharEscolhaPais(); return; }
+  btn.disabled = true;
+  fetch(SUPABASE_URL + '/rest/v1/rpc/mudar_pais_da_conta', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + session.access_token },
+    body: JSON.stringify({ p_pais: codigo })
+  }).then(function(r) { return r.json().catch(function() { return null; }).then(function(d) { return { ok: r.ok, d: d }; }); })
+    .then(function(res) {
+      if (!res.ok) { msg.className = 'msg msg-error'; msg.textContent = mensagemErroMudarPais(res.d && (res.d.message || res.d.error)); return; }
+      session.country_code = codigo;
+      contaMostrarPais(codigo);
+      msg.className = 'msg msg-success'; msg.textContent = 'País da conta mudado para ' + nomeDoPais(codigo) + '.';
+    })
+    .catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Sem internet. Para mudar o país da conta precisas de rede.'; })
+    .finally(function() { btn.disabled = false; contaFecharEscolhaPais(); });
+});
+
+// ---- Motorista (função driver-kyc), como o ecrã Motorista / KYC da app ----
+var MOTORISTA_DOCS = [['id', 'BI/identificação'], ['licenseFront', 'Carta — frente'], ['licenseBack', 'Carta — verso'], ['vehicle', 'Documento do veículo'], ['selfie', 'Selfie do candidato']];
+var motoristaDocs = {};
+var motoristaEstado = null;
+
+function mensagemMotorista(erro) {
+  erro = String(erro || '');
+  var mapa = {
+    MOTORISTA_KYC_NAO_APROVADO: 'A tua candidatura de motorista ainda não foi aprovada.',
+    CANDIDATURA_JA_EM_REVISAO: 'A candidatura já está em revisão.',
+    DADOS_KYC_INCOMPLETOS: 'Preenche o tipo de veículo, a matrícula e o número da carta.',
+    FICHEIRO_KYC_FORA_DA_PASTA_DO_UTILIZADOR: 'Volta a tirar as fotografias dos documentos.',
+    CAPACIDADE_INVALIDA: 'A capacidade do veículo tem de ser um número de kg maior que zero.',
+    VALIDADE_DA_CARTA_INVALIDA: 'A validade da carta tem de ter o formato AAAA-MM-DD.'
+  };
+  var codigo = Object.keys(mapa).find(function(c) { return erro.indexOf(c) > -1; });
+  return codigo ? mapa[codigo] : erro;
+}
+
+function motoristaMsg(tipo, texto) { var m = document.getElementById('motorista-msg'); m.className = 'msg msg-' + tipo; m.textContent = texto; }
+
+function motoristaDesenharDocs() {
+  var box = document.getElementById('motorista-docs');
+  box.innerHTML = '';
+  MOTORISTA_DOCS.forEach(function(d) {
+    var label = document.createElement('label');
+    label.className = 'btn ' + (motoristaDocs[d[0]] ? 'btn-secondary' : 'btn-primary');
+    label.textContent = motoristaDocs[d[0]] ? '✓ ' + d[1] : 'Fotografar: ' + d[1];
+    var input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*'; input.setAttribute('capture', d[0] === 'selfie' ? 'user' : 'environment');
+    input.style.display = 'none'; input.dataset.doc = d[0];
+    input.addEventListener('change', function() { if (input.files && input.files[0]) motoristaEnviarFoto(d[0], d[1], input.files[0]); });
+    label.appendChild(input);
+    box.appendChild(label);
+  });
+}
+
+function motoristaEnviarFoto(chave, nome, ficheiro) {
+  var path = getCurrentUserId() + '/driver/' + chave + '-' + Date.now() + '.jpg';
+  motoristaMsg('muted', 'A enviar ' + nome + '...');
+  fetch(SUPABASE_URL + '/storage/v1/object/kyc-artifacts/' + path, {
+    method: 'POST', headers: { 'Authorization': 'Bearer ' + session.access_token, 'apikey': ANON_KEY, 'Content-Type': ficheiro.type || 'image/jpeg' }, body: ficheiro
+  }).then(function(r) {
+    if (!r.ok) return r.json().catch(function() { return {}; }).then(function(d) { throw new Error(d.message || d.error || ('erro ' + r.status)); });
+    motoristaDocs[chave] = path;
+    motoristaDesenharDocs();
+    motoristaMsg('success', nome + ' enviado.');
+  }).catch(function(e) { motoristaMsg('error', 'Não foi possível enviar o documento (' + mensagemMotorista(e.message) + ').'); });
+}
+
+function motoristaChamar(action, corpo) {
+  return fetch(SUPABASE_URL + '/functions/v1/driver-kyc?action=' + action, { method: 'POST', headers: cabecalhosFuncao(), body: JSON.stringify(corpo || {}) })
+    .then(function(r) { return r.json().catch(function() { return {}; }).then(function(d) { if (!r.ok || d.error) throw new Error(d.error || ('erro ' + r.status)); return d; }); });
+}
+
+function motoristaCarregar() {
+  var estado = document.getElementById('motorista-estado');
+  var form = document.getElementById('motorista-form');
+  var btnDisp = document.getElementById('btn-motorista-disponivel');
+  estado.className = 'msg msg-muted'; estado.textContent = 'A ler o estado...';
+  form.style.display = 'none'; btnDisp.style.display = 'none';
+  motoristaChamar('status').then(function(d) {
+    motoristaEstado = d;
+    var app = d.application;
+    if (app && app.status === 'APPROVED') {
+      var disponivel = !!(d.profile && d.profile.online);
+      estado.className = 'msg msg-success';
+      estado.textContent = 'Candidatura aprovada ✅ País: ' + app.country_code + '. ' + (disponivel ? 'Estás disponível para receber pedidos.' : 'Estás indisponível: não recebes pedidos novos.');
+      btnDisp.textContent = disponivel ? 'Ficar indisponível' : 'Ficar disponível';
+      btnDisp.className = disponivel ? 'btn btn-secondary' : 'btn btn-primary';
+      btnDisp.dataset.online = disponivel ? '1' : '0';
+      btnDisp.style.display = 'block';
+    } else if (app && app.status === 'PENDING_REVIEW') {
+      estado.className = 'msg msg-muted'; estado.textContent = 'Candidatura em revisão. Não precisas reenviar os documentos.';
+    } else {
+      estado.className = app && app.status === 'REJECTED' ? 'msg msg-error' : 'msg msg-muted';
+      estado.textContent = app && app.status === 'REJECTED'
+        ? 'Candidatura recusada: ' + (app.rejection_reason || 'sem motivo indicado') + '. Podes corrigir e enviar de novo.'
+        : 'O país da candidatura é o país associado à tua conta: ' + nomeDoPais(contaPais) + '.';
+      motoristaDesenharDocs();
+      form.style.display = 'block';
+    }
+  }).catch(function(e) { estado.className = 'msg msg-error'; estado.textContent = mensagemMotorista(e.message) || 'Não foi possível ler o estado.'; });
+}
+
+document.getElementById('btn-motorista-abrir').addEventListener('click', function() {
+  var c = document.getElementById('motorista-conteudo');
+  var abrir = c.style.display === 'none';
+  c.style.display = abrir ? 'block' : 'none';
+  if (abrir) motoristaCarregar();
+});
+
+document.getElementById('btn-motorista-enviar').addEventListener('click', function() {
+  var btn = this;
+  var v = function(id) { return document.getElementById(id).value.trim(); };
+  if (MOTORISTA_DOCS.some(function(d) { return !motoristaDocs[d[0]]; })) { motoristaMsg('error', 'Faltam documentos/fotografias obrigatórios.'); return; }
+  if (!v('motorista-veiculo') || !v('motorista-matricula') || !v('motorista-carta')) { motoristaMsg('error', 'Preenche tipo de veículo, matrícula e número da carta.'); return; }
+  btn.disabled = true;
+  motoristaChamar('submit', {
+    vehicle_type: v('motorista-veiculo'), vehicle_plate: v('motorista-matricula'), license_number: v('motorista-carta'),
+    license_expiry: v('motorista-validade') || null,
+    vehicle_capacity_kg: v('motorista-capacidade') ? Number(v('motorista-capacidade').replace(',', '.')) : null,
+    id_document_path: motoristaDocs.id, license_front_path: motoristaDocs.licenseFront, license_back_path: motoristaDocs.licenseBack,
+    vehicle_document_path: motoristaDocs.vehicle, selfie_path: motoristaDocs.selfie
+  }).then(function() {
+    motoristaMsg('success', 'Candidatura enviada. A equipa irá rever os documentos.');
+    motoristaDocs = {};
+    motoristaCarregar();
+  }).catch(function(e) { motoristaMsg('error', mensagemMotorista(e.message)); })
+    .finally(function() { btn.disabled = false; });
+});
+
+document.getElementById('btn-motorista-disponivel').addEventListener('click', function() {
+  var btn = this, novo = btn.dataset.online !== '1';
+  btn.disabled = true;
+  motoristaChamar('set_online', { online: novo }).then(function() {
+    motoristaMsg('success', novo ? 'Estás disponível: os pedidos compatíveis aparecem em Entregas.' : 'Deixaste de receber pedidos novos.');
+    motoristaCarregar();
+  }).catch(function(e) { motoristaMsg('error', mensagemMotorista(e.message)); })
+    .finally(function() { btn.disabled = false; });
+});
+
 document.getElementById('btn-logout').addEventListener('click', function() {
   stopAllDeliveryRealtime();
   limparSessaoLocal();
@@ -3280,7 +3623,7 @@ document.querySelectorAll('.al-tab').forEach(function(btn) {
       document.getElementById('btn-canal-campo').style.display = (myRoles.indexOf('tecnico_campo') > -1 || myRoles.indexOf('supervisor') > -1 || myRoles.indexOf('super_admin') > -1) ? 'block' : 'none';
     }
     if (btn.dataset.tab === 'validar') loadValidar();
-    if (btn.dataset.tab === 'definicoes') { loadNotifications(); updateOfflineStatus(); kycLoadStatus(); cidadaoLoadStatus(); }
+    if (btn.dataset.tab === 'definicoes') { loadNotifications(); updateOfflineStatus(); contaCarregar(); cidadaoLoadStatus(); }
   });
 });
 
@@ -4704,7 +5047,7 @@ document.getElementById('btn-abrir-registar-local').addEventListener('click', fu
     if (!data.citizen_id_verified) {
       alert(data.citizen_id_status === 'PENDING_REVIEW'
         ? 'A tua verificação simples ainda está em revisão. Recebes uma notificação quando for aprovada.'
-        : 'Precisas de fazer a verificação simples primeiro — vai a Definições → Verificação simples.');
+        : 'Precisas de fazer a verificação simples primeiro — vai a Conta → Verificação simples.');
       return;
     }
     document.getElementById('registar-local-form').style.display = 'block';
@@ -4998,6 +5341,7 @@ function kycLoadStatus() {
     var protoEl = document.getElementById('kyc-protocolo');
     var form = document.getElementById('kyc-form');
     protoEl.textContent = '';
+    contaMostrarIdentidade(data.status === 'ID_VERIFIED');
     if (data.status === 'ID_VERIFIED') {
       statusEl.className = 'msg msg-success'; statusEl.textContent = '✅ Identidade verificada.';
       form.style.display = 'none';
