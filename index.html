@@ -4984,7 +4984,8 @@ document.getElementById('btn-cidadao-verif-enviar').addEventListener('click', fu
     body: JSON.stringify({ id_photo_front_url: cidadaoVerifUrls.frente, id_photo_back_url: cidadaoVerifUrls.verso, selfie_url: cidadaoVerifUrls.selfie })
   }).then(function(r) { return r.json(); }).then(function(data) {
     if (data.error) { msg.className = 'msg msg-error'; msg.textContent = data.error; return; }
-    msg.className = 'msg msg-success'; msg.textContent = 'Verificado!';
+    // O envio não aprova: fica "Em revisão" até um administrador decidir.
+    msg.className = 'msg msg-success'; msg.textContent = 'Enviado. Fica em revisão até uma pessoa confirmar as tuas fotos; recebes uma notificação.';
     cidadaoLoadStatus();
   }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
 });
