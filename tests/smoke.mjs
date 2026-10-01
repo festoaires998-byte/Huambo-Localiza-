@@ -56,6 +56,9 @@ async function abrir(query = '') {
     if (u.pathname.endsWith('/functions/v1/citizen-verify') && u.searchParams.get('action') === 'status') {
       return json({ citizen_id_verified: false, citizen_id_status: 'PENDING_REVIEW' });
     }
+    if (u.pathname.endsWith('/functions/v1/apagar-conta')) {
+      return JSON.parse(corpo).confirmacao.trim().toUpperCase() === 'APAGAR' ? json({ ok: true }) : json({ error: 'CONFIRMACAO_EM_FALTA' }, 400);
+    }
     if (u.pathname.startsWith('/storage/v1/object/')) return json(respostaStorage.body, respostaStorage.status);
     if (u.pathname.endsWith('/functions/v1/signing-keys')) return json({ ok: true });
     if (u.pathname.endsWith('/functions/v1/sync')) {
@@ -228,10 +231,37 @@ await teste('política de privacidade: página abre e o ecrã de entrada liga pa
   await p.goto(BASE + 'privacidade.html');
   assert.equal(await p.title(), 'Política de privacidade — Angola Localiza');
   const texto = await p.textContent('main');
-  for (const parte of ['Que dados recolhemos', 'Com quem partilhamos', 'Durante quanto tempo', 'Os teus direitos', 'Apagar a conta', 'segundo plano']) {
+  for (const parte of ['Que dados recolhemos', 'Com quem partilhamos', 'Durante quanto tempo', 'Os teus direitos', 'Apagar a conta', 'Definições → Apagar a minha conta', 'segundo plano']) {
     assert.ok(texto.includes(parte), `falta: ${parte}`);
   }
   assert.deepEqual(erros, []);
+  await context.close();
+});
+
+await teste('apagar a conta: só com APAGAR; depois sai, limpa a fila deste navegador e avisa', async () => {
+  const { page, context } = await abrir();
+  await page.evaluate(({ t, uid }) => {
+    window.session = { access_token: t, email: 't@exemplo.ao' };
+    session = window.session;
+    localStorage.setItem('al_pending_op_x', JSON.stringify({ operation_id: 'x', owner_user_id: uid, operation_type: 'create_favorite', payload: {} }));
+    localStorage.setItem('al_pending_op_y', JSON.stringify({ operation_id: 'y', owner_user_id: 'outra-pessoa', operation_type: 'create_favorite', payload: {} }));
+  }, { t: TOKEN, uid: UID });
+  const escrever = (texto) => page.evaluate((t) => {
+    const campo = document.getElementById('apagar-conta-confirmacao');
+    campo.value = t; campo.dispatchEvent(new Event('input'));
+    return document.getElementById('btn-apagar-conta').disabled;
+  }, texto);
+  assert.equal(await page.evaluate(() => document.getElementById('btn-apagar-conta').disabled), true);
+  assert.equal(await escrever('apaga'), true);
+  assert.equal(await escrever('apagar'), false);
+  const antes = pedidos.length;
+  await page.evaluate(() => document.getElementById('btn-apagar-conta').click());
+  await page.waitForFunction(() => document.getElementById('auth-msg').textContent.includes('foi apagada'), null, { timeout: 5000 });
+  const pedido = pedidos.slice(antes).find((p) => p.url.includes('/functions/v1/apagar-conta'));
+  assert.deepEqual(JSON.parse(pedido.corpo), { confirmacao: 'apagar' });
+  assert.equal(await page.evaluate(() => localStorage.getItem('al_pending_op_x')), null);
+  assert.ok(await page.evaluate(() => localStorage.getItem('al_pending_op_y')), 'a fila de outra pessoa fica');
+  assert.equal(await page.evaluate(() => session), null);
   await context.close();
 });
 

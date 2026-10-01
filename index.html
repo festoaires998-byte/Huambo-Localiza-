@@ -1456,6 +1456,14 @@ Erros: 400 validação · 401 chave inválida · 403 escopo insuficiente · 404 
         <button id="btn-apagar-historico" class="btn btn-secondary">🗑️ Apagar histórico de pesquisas</button>
         <p id="definicoes-msg" class="msg"></p>
         <button id="btn-logout" class="btn btn-danger-outline">Terminar sessão</button>
+
+        <div id="apagar-conta-box" style="margin-top:var(--sp-5);">
+          <p class="lead" style="margin-bottom:var(--sp-2);">Apagar a minha conta</p>
+          <p class="msg msg-muted" style="margin:0 0 var(--sp-2);">Apaga o teu nome, email e telefone, as fotos do BI e a selfie, os favoritos, as notificações e as moradas privadas. As entregas e as provas ficam, sem o teu nome. Não tem volta atrás.</p>
+          <input id="apagar-conta-confirmacao" class="input" type="text" placeholder="Escreve APAGAR para confirmar" autocomplete="off" aria-label="Escreve APAGAR para confirmar" />
+          <button id="btn-apagar-conta" class="btn btn-danger-outline" style="margin-top:var(--sp-2);" disabled>Apagar a minha conta</button>
+          <p id="apagar-conta-msg" class="msg"></p>
+        </div>
       </div>
     </div>
 
@@ -3197,6 +3205,38 @@ document.getElementById('btn-apagar-historico').addEventListener('click', functi
     if (r.ok) { msg.className = 'msg msg-success'; msg.textContent = 'Histórico apagado.'; }
     else { msg.className = 'msg msg-error'; msg.textContent = 'Erro ao apagar.'; }
   }).catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Erro de ligação.'; });
+});
+
+// ---- Apagar a minha conta (função apagar-conta; o servidor confirma a palavra outra vez) ----
+document.getElementById('apagar-conta-confirmacao').addEventListener('input', function(ev) {
+  document.getElementById('btn-apagar-conta').disabled = ev.target.value.trim().toUpperCase() !== 'APAGAR';
+});
+document.getElementById('btn-apagar-conta').addEventListener('click', function() {
+  var btn = document.getElementById('btn-apagar-conta');
+  var msg = document.getElementById('apagar-conta-msg');
+  var confirmacao = document.getElementById('apagar-conta-confirmacao').value;
+  btn.disabled = true;
+  msg.className = 'msg msg-muted'; msg.textContent = 'A apagar a conta...';
+  fetch(SUPABASE_URL + '/functions/v1/apagar-conta?action=apagar', {
+    method: 'POST', headers: cabecalhosFuncao(), body: JSON.stringify({ confirmacao: confirmacao })
+  }).then(function(r) { return r.json().catch(function() { return {}; }).then(function(d) { return { ok: r.ok, d: d }; }); })
+    .then(function(res) {
+      if (!res.ok) {
+        var erro = String(res.d && res.d.error || 'erro desconhecido');
+        msg.className = 'msg msg-error';
+        msg.textContent = erro.indexOf('SUPER_ADMIN') === 0
+          ? 'És super administrador: pede a outro super administrador para te tirar o cargo antes de apagares a conta.'
+          : 'Não foi possível apagar a conta (' + erro + ').';
+        btn.disabled = false;
+        return;
+      }
+      // A conta já foi apagada: limpa o que ficou neste navegador e volta ao início.
+      getPendingOps().forEach(function(op) { localStorage.removeItem('al_pending_op_' + op.operation_id); });
+      document.getElementById('btn-logout').click();
+      var authMsg = document.getElementById('auth-msg');
+      authMsg.className = 'msg msg-success'; authMsg.textContent = 'A tua conta foi apagada.';
+    })
+    .catch(function() { msg.className = 'msg msg-error'; msg.textContent = 'Sem ligação ao servidor. Tenta outra vez.'; btn.disabled = false; });
 });
 
 document.getElementById('btn-logout').addEventListener('click', function() {
